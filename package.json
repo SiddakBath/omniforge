@@ -1,0 +1,22 @@
+{
+  "name": "openforge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenForge monorepo",
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run --workspaces build",
+    "dev": "npm run -w @openforge/cli dev",
+    "lint": "npm run --workspaces lint",
+    "typecheck": "npm run --workspaces typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@types/react": "^19.2.1",
+    "@types/react-dom": "^19.2.1",
+    "typescript": "^5.8.2"
+  }
+}

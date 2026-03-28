@@ -1,0 +1,25 @@
+{
+  "id": "shell-exec",
+  "name": "Shell Execution",
+  "description": "Runs shell commands in a constrained environment.",
+  "instruction": "Use shell_exec for local automation. Explain risk before destructive operations.",
+  "tools": [
+    {
+      "name": "shell_exec",
+      "description": "Execute shell command",
+      "handler": "runTool",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": { "type": "string" },
+          "cwd": { "type": "string" },
+          "timeout_ms": { "type": "number", "default": 60000 }
+        },
+        "required": ["command"]
+      }
+    }
+  ],
+  "requiredParams": [],
+  "codeFile": "index.ts",
+  "createdAt": "2026-03-28T00:00:00.000Z"
+}
