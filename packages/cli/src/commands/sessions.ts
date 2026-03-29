@@ -1,40 +1,149 @@
 import {
+  type AgentSession,
   createLLMClient,
   DefaultToolExecutor,
+  findMissingSkillBins,
   listSessions,
   listSkills,
   loadConfig,
   loadSession,
   runAgentTurn,
   findMissingParams,
+  getBuiltinToolDefinitions,
   saveParamValue,
+  ensureSessionDataDir,
 } from '@openforge/core';
-import { Box, render, Text } from 'ink';
-import React from 'react';
-import { Header, Section, Spinner, StatusBox } from '../components/index.js';
 import { selectFromList, promptInput, promptPassword } from '../utils/interactive.js';
 import { displayBanner } from '../utils/banner.js';
 
-function StreamingOutput({ text, isRunning }: { text: string; isRunning: boolean }) {
-  const lines = text.split('\n');
-  return React.createElement(
-    Box,
-    { flexDirection: 'column' },
-    isRunning
-      ? React.createElement(
-          Box,
-          { marginBottom: 1 },
-          React.createElement(Spinner, { text: 'Agent is responding...' })
-        )
-      : null,
-    React.createElement(
-      Section,
-      {
-        title: 'Agent Response',
-        children: lines.map((line, i) => React.createElement(Text, { key: i, color: 'white' }, line || ' ')),
-      }
-    )
-  );
+const EXIT_INPUTS = new Set(['/exit', 'exit', '/quit', 'quit']);
+
+async function ensureSessionDependencies(session: AgentSession): Promise<void> {
+  const assignedSkills = await listSkills();
+  const activeSkills = assignedSkills.filter((skill) => session.skills.includes(skill.id));
+  const requiredParams = activeSkills.flatMap((skill) => skill.requiredParams);
+  const missingParams = await findMissingParams(requiredParams);
+  const missingBins = await findMissingSkillBins(activeSkills);
+
+  if (missingBins.length > 0) {
+    const list = missingBins.map((item) => `${item.bin} (required by ${item.skillId})`).join(', ');
+    throw new Error(`Cannot run session: missing required binaries: ${list}`);
+  }
+
+  if (missingParams.length === 0) {
+    return;
+  }
+
+  console.log('\n⚙️  Session requires additional parameters before running:');
+  missingParams.forEach((param: any) => {
+    console.log(`  • ${param.label}${param.description ? ` - ${param.description}` : ''}`);
+    const skillsNeedingIt = activeSkills
+      .filter((s: any) => s.requiredParams.some((rp: any) => rp.key === param.key))
+      .map((s: any) => s.id);
+    if (skillsNeedingIt.length > 0) {
+      console.log(`    Required by: ${skillsNeedingIt.join(', ')}`);
+    }
+  });
+  console.log('');
+
+  for (const param of missingParams) {
+    const value = param.secret ? await promptPassword(`🔐 ${param.label}`) : await promptInput(`📌 ${param.label}`);
+    if (!value.trim()) {
+      throw new Error(`${param.label} is required to continue.`);
+    }
+    await saveParamValue(param, value);
+  }
+
+  const remaining = await findMissingParams(requiredParams);
+  if (remaining.length > 0) {
+    const missing = remaining
+      .map(
+        (param: any) =>
+          `${param.label} (key: ${param.key}, required by: ${activeSkills
+            .filter((s: any) => s.requiredParams.some((rp: any) => rp.key === param.key))
+            .map((s: any) => s.id)
+            .join(', ')})`
+      )
+      .join(', ');
+    throw new Error(
+      `Cannot run session: required parameters are missing or invalid. ${missing}. ` +
+        `Parameters are stored in ~/.openforge/params.json. Run "openforge reset" to clear and re-enter parameters.`
+    );
+  }
+
+  console.log('\n✅ Required session parameters are satisfied.');
+}
+
+export async function runInteractiveSession(
+  initialSession: AgentSession,
+  initialUserMessage?: string,
+): Promise<AgentSession> {
+  await ensureSessionDependencies(initialSession);
+
+  const tools = getBuiltinToolDefinitions();
+  const client = await createLLMClient(initialSession.provider, initialSession.model);
+  const config = await loadConfig();
+  
+  // Use session-specific data directory for agent to write files to
+  const sessionDataDir = await ensureSessionDataDir(initialSession.id);
+  
+  const executor = new DefaultToolExecutor(sessionDataDir, {
+    provider: initialSession.provider,
+    model: initialSession.model,
+    apiKey: config.providers[initialSession.provider]?.apiKey,
+  });
+
+  let session = initialSession;
+  let queuedMessage = initialUserMessage?.trim() ? initialUserMessage : undefined;
+
+  console.log('\n💬 Interactive session started. Type /exit to stop.\n');
+
+  while (true) {
+    const userMessage = queuedMessage ?? (await promptInput('You'));
+    queuedMessage = undefined;
+
+    const trimmed = userMessage.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (EXIT_INPUTS.has(trimmed.toLowerCase())) {
+      break;
+    }
+
+    process.stdout.write('\nAgent: ');
+    session = await runAgentTurn({
+      session,
+      userInput: trimmed,
+      client,
+      toolExecutor: executor,
+      tools,
+      onTextDelta: (delta) => {
+        process.stdout.write(delta);
+      },
+      onToolCall: (toolCall) => {
+        process.stdout.write(`\n\n🔧 Calling tool: ${toolCall.name}`);
+        if (Object.keys(toolCall.input).length > 0) {
+          process.stdout.write('\n   Input: ' + JSON.stringify(toolCall.input));
+        }
+        process.stdout.write('\n');
+      },
+      onToolResult: (toolCall, result) => {
+        process.stdout.write(`   ✓ Tool returned: `);
+        if (result.ok) {
+          const output = result.output.length > 200 ? result.output.substring(0, 200) + '...' : result.output;
+          process.stdout.write(output);
+        } else {
+          process.stdout.write(`Error: ${result.output}`);
+        }
+        process.stdout.write('\n');
+      },
+    });
+    process.stdout.write('\n');
+  }
+
+  console.log('\n👋 Session paused. Run "openforge sessions" to continue later.\n');
+  return session;
 }
 
 export async function runSessionsCommand(): Promise<void> {
@@ -43,25 +152,7 @@ export async function runSessionsCommand(): Promise<void> {
   const sessions = await listSessions();
 
   if (sessions.length === 0) {
-    const EmptyView = () =>
-      React.createElement(
-        Box,
-        { flexDirection: 'column', paddingX: 2, paddingY: 1 },
-        React.createElement(Header, { title: 'Sessions' }),
-        React.createElement(
-          Section,
-          {
-            title: 'No Sessions Yet',
-            children: React.createElement(
-              Text,
-              null,
-              'Create your first agent with: openforge create'
-            ),
-          }
-        )
-      );
-
-    render(React.createElement(EmptyView));
+    console.log('\nNo sessions found. Create one with: openforge create\n');
     return;
   }
 
@@ -76,126 +167,14 @@ export async function runSessionsCommand(): Promise<void> {
 
   const session = await loadSession(chosen);
   if (!session) {
-    const ErrorView = () =>
-      React.createElement(
-        Box,
-        { flexDirection: 'column', paddingX: 2, paddingY: 1 },
-        React.createElement(StatusBox, { status: 'error', message: 'Session not found' })
-      );
-    render(React.createElement(ErrorView));
+    console.error('Session not found');
     process.exit(1);
   }
 
   console.clear?.();
+  console.log(`Resuming session: ${session.name}`);
+  console.log(`Provider/Model: ${session.provider}/${session.model}`);
+  console.log(`Status: ${session.status}`);
 
-  const SessionView = () =>
-    React.createElement(
-      Box,
-      { flexDirection: 'column', paddingX: 2, paddingY: 1 },
-      React.createElement(Header, { title: 'Resume Session', subtitle: session.name }),
-      React.createElement(
-        Section,
-        {
-          title: 'Session Info',
-          children: React.createElement(
-            React.Fragment,
-            null,
-            React.createElement(Text, null, 'Provider: ', session.provider),
-            React.createElement(Text, null, 'Model: ', session.model),
-            React.createElement(Text, null, 'Status: ', session.status)
-          ),
-        }
-      )
-    );
-
-  render(React.createElement(SessionView));
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const userMessage = await promptInput('\n💬 Message to agent');
-
-  if (!userMessage.trim()) {
-    process.exit(0);
-  }
-
-  const assignedSkills = await listSkills();
-  const activeSkills = assignedSkills.filter((skill) => session.skills.includes(skill.id));
-  const tools = activeSkills.flatMap((skill) => skill.tools);
-
-  const requiredParams = activeSkills.flatMap((skill) => skill.requiredParams);
-  const missingParams = await findMissingParams(requiredParams);
-
-  if (missingParams.length > 0) {
-    console.log('\n⚙️  Session requires additional parameters before running:');
-    missingParams.forEach((param) => {
-      console.log(`  • ${param.label}${param.description ? ` - ${param.description}` : ''}`);
-    });
-    console.log('');
-
-    for (const param of missingParams) {
-      const value = param.secret
-        ? await promptPassword(`🔐 ${param.label}`)
-        : await promptInput(`📌 ${param.label}`);
-      if (!value.trim()) {
-        throw new Error(`${param.label} is required to continue.`);
-      }
-      await saveParamValue(param, value);
-    }
-
-    const remaining = await findMissingParams(requiredParams);
-    if (remaining.length > 0) {
-      throw new Error('Cannot run session: required parameters remain unsatisfied.');
-    }
-
-    console.log('\n✅ Required session parameters are satisfied.');
-  }
-
-  const client = await createLLMClient(session.provider, session.model);
-  const config = await loadConfig();
-  const executor = new DefaultToolExecutor(process.cwd(), {
-    provider: session.provider,
-    model: session.model,
-    apiKey: config.providers[session.provider]?.apiKey,
-  });
-
-  console.clear?.();
-
-  let streamed = '';
-  const app = render(React.createElement(StreamingOutput, { text: streamed, isRunning: true }));
-
-  const updated = await runAgentTurn({
-    session,
-    userInput: userMessage,
-    client,
-    toolExecutor: executor,
-    tools,
-    onTextDelta: (delta) => {
-      streamed += delta;
-      app.rerender(React.createElement(StreamingOutput, { text: streamed, isRunning: true }));
-    },
-  });
-
-  app.unmount();
-
-  console.clear?.();
-  const SuccessView = () =>
-    React.createElement(
-      Box,
-      { flexDirection: 'column', paddingX: 2, paddingY: 1 },
-      React.createElement(StatusBox, { status: 'success', message: 'Message processed successfully' }),
-      React.createElement(
-        Section,
-        {
-          title: 'Session Updated',
-          children: React.createElement(
-            React.Fragment,
-            null,
-            React.createElement(Text, null, 'Session ID: ', updated.id),
-            React.createElement(Text, null, 'Status: ', updated.status),
-            React.createElement(Text, null, 'Use \'openforge sessions\' to continue.')
-          ),
-        }
-      )
-    );
-
-  render(React.createElement(SuccessView));
+  await runInteractiveSession(session);
 }

@@ -14,7 +14,7 @@ export interface ToolDefinition {
   name: string;
   description: string;
   parameters: Record<string, unknown>;
-  handler?: string;
+  category?: 'builtin';
 }
 
 /** Tool invocation emitted by the model runtime. */
@@ -32,21 +32,22 @@ export interface RequiredParam {
   secret: boolean;
 }
 
-/** Reusable skill definition persisted to ~/.openforge/skills. */
+/** Reusable skill playbook persisted to ~/.openforge/skills. */
 export interface Skill {
   id: string;
   name: string;
   description: string;
-  instruction: string;
-  tools: ToolDefinition[];
+  homepage?: string;
+  metadata?: Record<string, unknown>;
+  content: string;
   requiredParams: RequiredParam[];
-  codeFile: string;
+  requiredBins: string[];
   createdAt: string;
 }
 
 export interface SkillBundle {
   skill: Skill;
-  code: string;
+  markdown?: string;
 }
 
 /** Restorable checkpoint captured after each complete turn. */

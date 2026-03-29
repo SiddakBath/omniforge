@@ -1,5 +1,6 @@
 import { loadProviderCatalog } from './provider-catalog.js';
 import { loadConfig, saveConfig } from './config-store.js';
+import { bootstrapOpenForge } from './bootstrap.js';
 
 export interface OnboardingInput {
   provider: string;
@@ -25,4 +26,6 @@ export async function runOnboarding(input: OnboardingInput): Promise<void> {
   config.generator.model = input.model;
   config.providers[input.provider] = { apiKey: input.apiKey };
   await saveConfig(config);
+
+  await bootstrapOpenForge();
 }

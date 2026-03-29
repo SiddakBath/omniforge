@@ -6,9 +6,10 @@
 
 - **Provider abstraction** via `LLMClient.complete(messages, tools, stream)`
 - **Runtime loop** for tool-use turn execution
+- **Built-in tool capability layer** (file IO, terminal commands, HTTP, web search)
 - **Generator pipeline**
   1. Skill audit
-  2. Skill creation
+  2. Skill markdown generation (workflow guides)
   3. Required parameter enforcement
   4. Agent session assembly
 - **Storage layer** for config, params, skills, and sessions
@@ -29,11 +30,12 @@
 ## Session lifecycle
 
 1. User describes requested automation.
-2. Generator chooses existing/new skills.
+2. Generator chooses existing/new skills (workflow guides).
 3. Missing required params are blocked until filled.
-4. Session is assembled and persisted.
-5. Agent runtime executes loop with tool calls.
-6. Checkpoint written at end of each completed turn.
+4. Session system prompt is assembled with tools and skills injected separately.
+5. Session is assembled and persisted.
+6. Agent runtime executes loop with tool calls.
+7. Checkpoint written at end of each completed turn.
 
 ## Design constraints
 

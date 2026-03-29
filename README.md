@@ -13,7 +13,8 @@ No YAML. No marketplace. No config sprawl.
   - `@openforge/cli` — interactive terminal experience (onboarding, create, sessions, skills, settings)
   - `@openforge/web` — local Next.js UI with the same core flows
 - **Provider catalog** in [providers/catalog.json](providers/catalog.json)
-- **Starter skills** in [skills/starter-skills.json](skills/starter-skills.json)
+- **Built-in tools (capabilities)** in core runtime
+- **Skills** as markdown workflow guides in [skills/](skills/)
 - **Portable local state** in `~/.openforge/`
 
 ## Quick install
@@ -75,7 +76,7 @@ OpenForge writes all state to `~/.openforge/`:
 
 - `config.json` — generator defaults and provider keys
 - `params.json` — required skill params (secret values encrypted at rest)
-- `skills/*.json` — reusable generated skill definitions
+- `skills/<skill-id>/SKILL.md` — reusable generated skill playbooks
 - `sessions/*.json` — agent sessions with full history and checkpoints
 
 ## Contributing
@@ -93,4 +94,5 @@ OpenForge writes all state to `~/.openforge/`:
 
 - Provider catalog includes: Anthropic, OpenAI, Gemini, DeepSeek, xAI, Groq, Mistral, OpenRouter.
 - Anthropic and Gemini use native SDK paths; compatible providers use OpenAI-style API routing.
-- Starter skills are available to all agents by default and require no extra credentials.
+- Skills are markdown playbooks with YAML frontmatter metadata.
+- Tools are runtime capabilities and are injected separately from skills.

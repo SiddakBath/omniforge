@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { assertNonStreamingResponse } from './llm.js';
 import { checkpointSession, saveSession } from './session-store.js';
-import type { AgentSession, LLMClient, Message, ToolDefinition, ToolExecutor } from './types.js';
+import type { AgentSession, LLMClient, Message, ToolDefinition, ToolExecutor, ToolCall, ToolExecutionResult } from './types.js';
 
 export interface RunTurnOptions {
   session: AgentSession;
@@ -10,6 +10,8 @@ export interface RunTurnOptions {
   toolExecutor: ToolExecutor;
   tools: ToolDefinition[];
   onTextDelta?: (delta: string) => void;
+  onToolCall?: (toolCall: ToolCall) => void;
+  onToolResult?: (toolCall: ToolCall, result: ToolExecutionResult) => void;
 }
 
 export async function runAgentTurn(options: RunTurnOptions): Promise<AgentSession> {
@@ -49,7 +51,9 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<AgentSessio
     }
 
     for (const toolCall of resolved.toolCalls) {
+      options.onToolCall?.(toolCall);
       const result = await options.toolExecutor.execute(toolCall);
+      options.onToolResult?.(toolCall, result);
       const content = JSON.stringify({ ok: result.ok, output: result.output });
       const toolMessage: Message = {
         id: randomUUID(),

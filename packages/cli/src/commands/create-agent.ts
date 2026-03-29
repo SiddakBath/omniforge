@@ -1,9 +1,10 @@
 import {
-  bootstrapOpenForge,
   createLLMClient,
   DefaultToolExecutor,
+  findMissingSkillBins,
   findMissingParams,
   generateAgentSession,
+  getBuiltinToolDefinitions,
   getProviderById,
   listSkills,
   loadConfig,
@@ -12,13 +13,13 @@ import {
   saveConfig,
   saveParamValue,
   saveSession,
+  ensureSessionDataDir,
 } from '@openforge/core';
 import { input, password, select } from '@inquirer/prompts';
 import { displayBanner } from '../utils/banner.js';
+import { runInteractiveSession } from './sessions.js';
 
 export async function runCreateAgentCommand(initialRequest: string): Promise<void> {
-  await bootstrapOpenForge();
-
   displayBanner();
   console.log('Create agent\n');
 
@@ -99,14 +100,13 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   const assignedSkills = (await listSkills()).filter((skill: { id: string }) => output.session.skills.includes(skill.id));
 
   console.log('\n✅ Session generated with assigned skills:');
-  assignedSkills.forEach((skill: { id: string; description?: string; tools: Array<{ name: string }> }) => {
+  assignedSkills.forEach((skill: { id: string; name: string; description?: string; requiredBins: string[] }) => {
     console.log(`  • ${skill.id}`);
     if (skill.description) {
       console.log(`    ${skill.description}`);
     }
-    if (skill.tools && skill.tools.length > 0) {
-      const toolNames = skill.tools.map((t: { name: string }) => t.name).join(', ');
-      console.log(`    Tools: ${toolNames}`);
+    if (skill.requiredBins.length > 0) {
+      console.log(`    Requires bins: ${skill.requiredBins.join(', ')}`);
     }
   });
 
@@ -119,8 +119,20 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
 
   if (missing.length > 0) {
     console.log('\nStep 4/6 — Some skills need additional parameters:');
-    missing.forEach((param: { label: string; description?: string }) => {
+    missing.forEach((param: { key?: string; label: string; description?: string }) => {
       console.log(`  • ${param.label}${param.description ? ` - ${param.description}` : ''}`);
+      if (param.key) {
+        const skillsNeedingIt = requiredParamsFromSkills
+          .filter((p: { key: string }) => p.key === param.key)
+          .map((p: any) => {
+            const skill = assignedSkills.find((s: any) => s.requiredParams.some((rp: any) => rp.key === param.key));
+            return skill?.id;
+          })
+          .filter(Boolean);
+        if (skillsNeedingIt.length > 0) {
+          console.log(`    Required by: ${[...new Set(skillsNeedingIt)].join(', ')}`);
+        }
+      }
     });
     console.log('');
 
@@ -143,9 +155,27 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   }
 
   const remainingMissing = await findMissingParams(requiredParamsFromSkills);
+  const missingBins = await findMissingSkillBins(assignedSkills);
 
   if (remainingMissing.length > 0) {
-    throw new Error('Cannot start agent: required parameters remain unsatisfied');
+    const missing = remainingMissing
+      .map(
+        (param: any) =>
+          `${param.label} (key: ${param.key}, required by: ${assignedSkills
+            .filter((s: any) => s.requiredParams.some((rp: any) => rp.key === param.key))
+            .map((s: any) => s.id)
+            .join(', ')})`
+      )
+      .join(', ');
+    throw new Error(
+      `Cannot start agent: required parameters are missing or invalid. ${missing}. ` +
+      `Parameters are stored in ~/.openforge/params.json. Run "openforge reset" to clear and re-enter parameters.`
+    );
+  }
+
+  if (missingBins.length > 0) {
+    const list = missingBins.map((item) => `${item.bin} (required by ${item.skillId})`).join(', ');
+    throw new Error(`Cannot start agent: missing required binaries: ${list}`);
   }
 
   console.log('✅ All skill parameters configured successfully.\n');
@@ -168,22 +198,20 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   }
 
   const client = await createLLMClient(provider, model);
-  const executor = new DefaultToolExecutor(process.cwd(), {
+  
+  // Ensure session data directory exists for agent to write files to
+  const sessionDataDir = await ensureSessionDataDir(output.session.id);
+  
+  const executor = new DefaultToolExecutor(sessionDataDir, {
     provider,
     model,
     apiKey: config.providers[provider]?.apiKey,
   });
-  const tools = assignedSkills.flatMap(
-    (skill: { tools: Array<{ name: string; description: string; parameters: Record<string, unknown> }> }) => skill.tools,
-  );
+  const tools = getBuiltinToolDefinitions();
 
-  console.log(`Step 5a/6 — Initializing ${tools.length} tools from skills:\n`);
-  assignedSkills.forEach((skill: { id: string; tools: Array<{ name: string; description?: string }> }) => {
-    if (skill.tools && skill.tools.length > 0) {
-      skill.tools.forEach((tool: { name: string; description?: string }) => {
-        console.log(`  • ${tool.name}${tool.description ? ` - ${tool.description}` : ''}`);
-      });
-    }
+  console.log(`Step 5a/6 — Initializing ${tools.length} built-in tools:\n`);
+  tools.forEach((tool: { name: string; description?: string }) => {
+    console.log(`  • ${tool.name}${tool.description ? ` - ${tool.description}` : ''}`);
   });
   console.log('');
 
@@ -198,6 +226,23 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
     onTextDelta: (chunk: string) => {
       process.stdout.write(chunk);
     },
+    onToolCall: (toolCall) => {
+      process.stdout.write(`\n\n🔧 Calling tool: ${toolCall.name}`);
+      if (Object.keys(toolCall.input).length > 0) {
+        process.stdout.write('\n   Input: ' + JSON.stringify(toolCall.input));
+      }
+      process.stdout.write('\n');
+    },
+    onToolResult: (toolCall, result) => {
+      process.stdout.write(`   ✓ Tool returned: `);
+      if (result.ok) {
+        const output = result.output.length > 200 ? result.output.substring(0, 200) + '...' : result.output;
+        process.stdout.write(output);
+      } else {
+        process.stdout.write(`Error: ${result.output}`);
+      }
+      process.stdout.write('\n');
+    },
   });
 
   console.log('\n\n✅ Agent created successfully.');
@@ -207,5 +252,6 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   console.log(`Model: ${model}`);
   console.log(`Skills: ${assignedSkills.map((s: { id: string }) => s.id).join(', ')}`);
   console.log(`Tools: ${tools.map((t: { name: string }) => t.name).join(', ')}`);
-  console.log("Use 'openforge sessions' to resume this agent.\n");
+  console.log('\nEntering interactive session now...');
+  await runInteractiveSession(session);
 }

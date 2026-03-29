@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
+import { bootstrapOpenForge } from '@openforge/core';
 import { runCreateAgentCommand } from './commands/create-agent.js';
 import { runOnboardingCommand } from './commands/onboarding.js';
 import { runSessionsCommand } from './commands/sessions.js';
@@ -14,6 +15,10 @@ program
   .name('openforge')
   .description('OpenForge CLI')
   .version('0.1.0');
+
+program.hook('preAction', async () => {
+  await bootstrapOpenForge();
+});
 
 program.command('onboard').description('Run first-time provider/model onboarding').action(runOnboardingCommand);
 

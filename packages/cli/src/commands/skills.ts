@@ -82,20 +82,20 @@ function SkillViewer({ skills }: { skills: any[] }) {
                     )
                   )
                 : null,
-              currentSkill.tools && currentSkill.tools.length > 0
+              currentSkill.requiredBins && currentSkill.requiredBins.length > 0
                 ? React.createElement(
                     React.Fragment,
                     null,
                     React.createElement(
                       Box,
                       { marginTop: 1 },
-                      React.createElement(Text, null, 'Available Tools:')
+                      React.createElement(Text, null, 'Required Binaries:')
                     ),
-                    currentSkill.tools.map((tool: any, i: number) =>
+                    currentSkill.requiredBins.map((bin: string, i: number) =>
                       React.createElement(
                         Box,
                         { key: i, marginLeft: 2 },
-                        React.createElement(Text, null, `• ${tool.name}: ${tool.description}`)
+                        React.createElement(Text, null, `• ${bin}`)
                       )
                     )
                   )
@@ -113,7 +113,6 @@ function SkillViewer({ skills }: { skills: any[] }) {
 }
 
 export async function runSkillsCommand(): Promise<void> {
-  await bootstrapOpenForge();
   console.clear?.();
   displayBanner();
   const skills = await listSkills();

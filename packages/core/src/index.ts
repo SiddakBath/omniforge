@@ -1,6 +1,7 @@
 export * from './types.js';
 export * from './agent-runtime.js';
 export * from './bootstrap.js';
+export * from './builtin-tools.js';
 export * from './config-store.js';
 export * from './generator.js';
 export * from './llm-factory.js';
@@ -9,6 +10,7 @@ export * from './onboarding.js';
 export * from './params-store.js';
 export * from './paths.js';
 export * from './provider-catalog.js';
+export * from './skill-markdown.js';
 export * from './session-store.js';
 export * from './skill-store.js';
 export * from './starter-skills.js';
