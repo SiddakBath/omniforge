@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { createMessage } from './agent-runtime.js';
-import { getBuiltinToolDefinitions } from './builtin-tools.js';
+import { getBuiltinToolDefinitions } from './builtin-tools/registry.js';
 import { createLLMClient } from './llm-factory.js';
 import { assertNonStreamingResponse } from './llm.js';
 import { findMissingParams } from './params-store.js';

@@ -1,14 +1,7 @@
-import { exec as execCallback } from 'child_process';
-import { mkdir, readFile, writeFile } from 'fs/promises';
-import path from 'path';
-import { promisify } from 'util';
-import type { ToolCall, ToolDefinition, ToolExecutionResult } from './types.js';
+export { getBuiltinToolDefinitions, executeBuiltinTool } from './builtin-tools/registry.js';
+export type { BuiltinToolContext } from './builtin-tools/types.js';
 
-const exec = promisify(execCallback);
-
-export interface BuiltinToolContext {
-  workspaceRoot: string;
-}
+/*
 
 const BUILTIN_TOOLS: ToolDefinition[] = [
   {
@@ -443,3 +436,5 @@ export async function executeBuiltinTool(call: ToolCall, context: BuiltinToolCon
 
   return undefined;
 }
+
+*/

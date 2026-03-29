@@ -1,4 +1,4 @@
-import { executeBuiltinTool } from './builtin-tools.js';
+import { executeBuiltinTool } from './builtin-tools/registry.js';
 import type { ToolCall, ToolExecutionResult, ToolExecutor } from './types.js';
 
 interface ExecutorContext {
@@ -15,9 +15,15 @@ export class DefaultToolExecutor implements ToolExecutor {
   ) {}
 
   async execute(call: ToolCall): Promise<ToolExecutionResult> {
-    const builtInResult = await executeBuiltinTool(call, {
+    const builtinContext = {
       workspaceRoot: this.workspaceRoot,
-    });
+      ...(this._context.provider ? { provider: this._context.provider } : {}),
+      ...(this._context.model ? { model: this._context.model } : {}),
+      ...(this._context.apiKey ? { apiKey: this._context.apiKey } : {}),
+      ...(this._context.baseUrl ? { baseUrl: this._context.baseUrl } : {}),
+    };
+
+    const builtInResult = await executeBuiltinTool(call, builtinContext);
 
     if (builtInResult) {
       return builtInResult;

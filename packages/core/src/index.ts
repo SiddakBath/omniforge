@@ -1,7 +1,8 @@
 export * from './types.js';
 export * from './agent-runtime.js';
 export * from './bootstrap.js';
-export * from './builtin-tools.js';
+export { getBuiltinToolDefinitions, executeBuiltinTool } from './builtin-tools/registry.js';
+export type { BuiltinToolContext } from './builtin-tools/types.js';
 export * from './config-store.js';
 export * from './generator.js';
 export * from './llm-factory.js';
