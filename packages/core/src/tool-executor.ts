@@ -1,4 +1,5 @@
 import { executeBuiltinTool } from './builtin-tools/registry.js';
+import { resolveParamValue } from './params-store.js';
 import type { ToolCall, ToolExecutionResult, ToolExecutor } from './types.js';
 
 interface ExecutorContext {
@@ -23,7 +24,10 @@ export class DefaultToolExecutor implements ToolExecutor {
       ...(this._context.baseUrl ? { baseUrl: this._context.baseUrl } : {}),
     };
 
-    const builtInResult = await executeBuiltinTool(call, builtinContext);
+    // Resolve parameter placeholders in tool call input before execution
+    const resolvedCall = await this.resolveParameters(call);
+
+    const builtInResult = await executeBuiltinTool(resolvedCall, builtinContext);
 
     if (builtInResult) {
       return builtInResult;
@@ -33,5 +37,58 @@ export class DefaultToolExecutor implements ToolExecutor {
       ok: false,
       output: `Unknown tool: ${call.name}. This runtime only executes built-in capabilities.`,
     };
+  }
+
+  /**
+   * Recursively resolve parameter placeholders (${PARAM_NAME}) in tool call input
+   * by fetching values from the params store.
+   */
+  private async resolveParameters(call: ToolCall): Promise<ToolCall> {
+    const resolvedInput = await this.resolveValue(call.input);
+    return {
+      ...call,
+      input: resolvedInput as Record<string, unknown>,
+    };
+  }
+
+  /**
+   * Recursively resolve parameter placeholders in any value (string, object, array, etc.)
+   */
+  private async resolveValue(value: unknown): Promise<unknown> {
+    if (typeof value === 'string') {
+      return this.resolveString(value);
+    }
+    if (Array.isArray(value)) {
+      return Promise.all(value.map((item) => this.resolveValue(item)));
+    }
+    if (typeof value === 'object' && value !== null) {
+      const resolved: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(value)) {
+        resolved[key] = await this.resolveValue(val);
+      }
+      return resolved;
+    }
+    return value;
+  }
+
+  /**
+   * Resolve parameter placeholders in a string.
+   * Replaces ${PARAM_NAME} with the resolved param value from the params store.
+   */
+  private async resolveString(str: string): Promise<string> {
+    const paramPattern = /\$\{([A-Z][A-Z0-9_]*)\}/g;
+    let result = str;
+    let match: RegExpExecArray | null;
+
+    // eslint-disable-next-line no-cond-assign
+    while ((match = paramPattern.exec(str)) !== null) {
+      const paramKey = match[1]!;
+      const paramValue = await resolveParamValue(paramKey);
+      if (paramValue !== undefined) {
+        result = result.replace(match[0], paramValue);
+      }
+    }
+
+    return result;
   }
 }

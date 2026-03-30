@@ -13,7 +13,7 @@ import {
   saveParamValue,
   ensureSessionDataDir,
 } from '@openforge/core';
-import { selectFromList, promptInput, promptPassword } from '../utils/interactive.js';
+import { selectFromList, promptInput, promptPassword, promptConfirm } from '../utils/interactive.js';
 import { displayBanner } from '../utils/banner.js';
 
 const EXIT_INPUTS = new Set(['/exit', 'exit', '/quit', 'quit']);
@@ -122,21 +122,25 @@ export async function runInteractiveSession(
         process.stdout.write(delta);
       },
       onToolCall: (toolCall) => {
-        process.stdout.write(`\n\n🔧 Calling tool: ${toolCall.name}`);
+        console.log(`\n\n🔧 Tool requested: ${toolCall.name}`);
         if (Object.keys(toolCall.input).length > 0) {
-          process.stdout.write('\n   Input: ' + JSON.stringify(toolCall.input));
+          console.log(`   • Input: ${JSON.stringify(toolCall.input, null, 2)}`);
         }
-        process.stdout.write('\n');
+      },
+      onToolCallConfirm: async (toolCall) => {
+        console.log(`\n🚦 About to execute tool: ${toolCall.name}`);
+        if (Object.keys(toolCall.input).length > 0) {
+          console.log(`   • Input preview: ${JSON.stringify(toolCall.input, null, 2)}`);
+        }
+        return await promptConfirm('Approve this tool execution?');
       },
       onToolResult: (toolCall, result) => {
-        process.stdout.write(`   ✓ Tool returned: `);
+        const display = result.output.length > 240 ? result.output.substring(0, 240) + '...' : result.output;
         if (result.ok) {
-          const output = result.output.length > 200 ? result.output.substring(0, 200) + '...' : result.output;
-          process.stdout.write(output);
+          console.log(`   ✅ ${toolCall.name} output: ${display}`);
         } else {
-          process.stdout.write(`Error: ${result.output}`);
+          console.log(`   ❌ ${toolCall.name} error (or canceled): ${display}`);
         }
-        process.stdout.write('\n');
       },
     });
     process.stdout.write('\n');

@@ -1,9 +1,12 @@
 import { readdir, readFile } from 'fs/promises';
+import { fileURLToPath } from 'url';
 import path from 'path';
 import { parseSkillMarkdown } from './skill-markdown.js';
 import type { Skill, SkillBundle } from './types.js';
 
 const SKILL_MARKDOWN_FILE = 'SKILL.md';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function loadBundleFromDir(skillDir: string): Promise<SkillBundle | undefined> {
   const markdownPath = path.join(skillDir, SKILL_MARKDOWN_FILE);
@@ -16,32 +19,34 @@ async function loadBundleFromDir(skillDir: string): Promise<SkillBundle | undefi
   }
 }
 
-export async function loadStarterSkillBundles(): Promise<SkillBundle[]> {
-  const candidates = [
-    process.env.OPENFORGE_STARTER_SKILLS_DIR,
-    path.resolve(process.cwd(), 'skills'),
-  ];
+async function loadFromDirectory(skillsDir: string): Promise<SkillBundle[]> {
+  try {
+    const entries = await readdir(skillsDir, { withFileTypes: true });
+    const directories = entries.filter((entry) => entry.isDirectory());
+    const bundles = await Promise.all(
+      directories.map((entry) => loadBundleFromDir(path.join(skillsDir, entry.name))),
+    );
+    const resolved = bundles.filter((bundle): bundle is SkillBundle => Boolean(bundle));
+    return resolved.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
+  } catch {
+    return [];
+  }
+}
 
-  for (const candidate of candidates) {
-    if (!candidate) {
-      continue;
-    }
-    try {
-      const entries = await readdir(candidate, { withFileTypes: true });
-      const directories = entries.filter((entry) => entry.isDirectory());
-      const bundles = await Promise.all(
-        directories.map((entry) => loadBundleFromDir(path.join(candidate, entry.name))),
-      );
-      const resolved = bundles.filter((bundle): bundle is SkillBundle => Boolean(bundle));
-      if (resolved.length > 0) {
-        return resolved.sort((a, b) => a.skill.name.localeCompare(b.skill.name));
-      }
-    } catch {
-      // fallback
+export async function loadStarterSkillBundles(): Promise<SkillBundle[]> {
+  // Environment variable takes precedence for custom skill locations
+  if (process.env.OPENFORGE_STARTER_SKILLS_DIR) {
+    const bundles = await loadFromDirectory(process.env.OPENFORGE_STARTER_SKILLS_DIR);
+    if (bundles.length > 0) {
+      return bundles;
     }
   }
 
-  return [];
+  // Resolve skills directory relative to this file's location (works regardless of cwd)
+  // __dirname is packages/core/src, skills folder is at the root
+  const skillsDir = path.resolve(__dirname, '..', '..', '..', 'skills');
+  
+  return loadFromDirectory(skillsDir);
 }
 
 export async function loadStarterSkills(): Promise<Skill[]> {

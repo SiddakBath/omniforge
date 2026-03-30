@@ -7,8 +7,11 @@ metadata:
   requires:
     bins:
       - gog
-    env:
+    params:
       - GOG_ACCOUNT
+      - GOOGLE_CLIENT_SECRET_PATH
+    optional:
+      - GOG_DEFAULT_CALENDAR_ID
 ---
 
 # Google Workspace

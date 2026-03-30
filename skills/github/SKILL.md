@@ -5,7 +5,7 @@ homepage: https://cli.github.com
 metadata:
   emoji: "🐙"
   requires:
-    env:
+    params:
       - GITHUB_TOKEN
 ---
 

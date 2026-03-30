@@ -30,6 +30,7 @@ export interface RequiredParam {
   label: string;
   description: string;
   secret: boolean;
+  required?: boolean; // defaults to true; if false, param is optional
 }
 
 /** Reusable skill playbook persisted to ~/.openforge/skills. */

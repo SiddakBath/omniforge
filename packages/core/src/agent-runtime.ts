@@ -11,6 +11,7 @@ export interface RunTurnOptions {
   tools: ToolDefinition[];
   onTextDelta?: (delta: string) => void;
   onToolCall?: (toolCall: ToolCall) => void;
+  onToolCallConfirm?: (toolCall: ToolCall) => Promise<boolean>;
   onToolResult?: (toolCall: ToolCall, result: ToolExecutionResult) => void;
 }
 
@@ -52,9 +53,20 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<AgentSessio
 
     for (const toolCall of resolved.toolCalls) {
       options.onToolCall?.(toolCall);
-      const result = await options.toolExecutor.execute(toolCall);
-      options.onToolResult?.(toolCall, result);
-      const content = JSON.stringify({ ok: result.ok, output: result.output });
+      let executionResult: ToolExecutionResult;
+
+      const approved = options.onToolCallConfirm ? await options.onToolCallConfirm(toolCall) : true;
+      if (!approved) {
+        executionResult = {
+          ok: false,
+          output: 'Tool execution canceled by user approval.',
+        };
+      } else {
+        executionResult = await options.toolExecutor.execute(toolCall);
+      }
+
+      options.onToolResult?.(toolCall, executionResult);
+      const content = JSON.stringify({ ok: executionResult.ok, output: executionResult.output });
       const toolMessage: Message = {
         id: randomUUID(),
         role: 'tool',

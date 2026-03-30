@@ -79,7 +79,7 @@ export async function generateAgentSession(input: GenerateAgentInput): Promise<G
   );
 
   const missingParams = await findMissingParams(allRequiredParams);
-  const systemPrompt = buildSystemPrompt(input.request, assignedSkills, builtInTools);
+  const systemPrompt = await buildSystemPrompt(input.request, assignedSkills, builtInTools);
 
   const session: AgentSession = {
     id: randomUUID(),
@@ -133,6 +133,7 @@ async function runSkillAudit(client: Awaited<ReturnType<typeof createLLMClient>>
           '- Generic advice that applies to all tasks (belongs in agent behavior, not skills).',
           '',
           'Prefer reusing existing skills. Only create new skills for genuinely new domains/integrations.',
+          'The user message includes the full list of existing skills in the `skills` array. Evaluate them and reuse any that fit, rather than creating duplicates.',
           '',
           '## Output Format (STRICT JSON ONLY)',
           'Return: { useSkillIds: [string], createSkills: [{ name: string, description: string }] }',
@@ -149,7 +150,12 @@ async function runSkillAudit(client: Awaited<ReturnType<typeof createLLMClient>>
             name: skill.name,
             description: skill.description,
             requiredBins: skill.requiredBins,
-            requiredParams: skill.requiredParams.map((param) => param.key),
+            requiredParams: skill.requiredParams.map((param) => ({
+              key: param.key,
+              label: param.label,
+              description: param.description,
+              secret: param.secret,
+            })),
           })),
         }),
       ),
@@ -213,9 +219,16 @@ async function createSkillPlaybook(
           '- "Write clearly" (too generic)',
           '- "Read and summarize" (simple tool use, no integration logic)',
           '',
-          'Environment Parameters (credentials/API keys):',
-          '- If the skill requires credentials, declare in metadata.requires.env as UPPERCASE_SNAKE_CASE.',
-          '- Example: metadata.requires.env: [GITHUB_TOKEN, GMAIL_API_KEY, GOOGLE_WORKSPACE_ADMIN_EMAIL]',
+          'Existing skills are included in the user message as `existingSkills`. Use that list as a reference to avoid generating a duplicate or overlapping skill.',
+          '- If any existing skill already defines an equivalent required parameter, reuse that same parameter key in this skill as well (do not create duplicate credentials).',
+          '',
+          'Required and Optional Parameters (credentials/API keys):',
+          '- Required parameters: declare in metadata.requires.params as UPPERCASE_SNAKE_CASE.',
+          '- Optional parameters: declare in metadata.requires.optional as UPPERCASE_SNAKE_CASE.',
+          '- Examples:',
+          '  metadata.requires.params: [GITHUB_TOKEN, GMAIL_API_KEY]  # Must be provided',
+          '  metadata.requires.optional: [GOOGLE_WORKSPACE_ADMIN_EMAIL, DEFAULT_CALENDAR_ID]  # Optional with sensible defaults',
+          '- Use optional for parameters that have defaults or aren\'t always needed.',
           '- In markdown body, reference as ${PARAM_NAME}, NOT actual values.',
           '- Runtime resolves credentials securely before execution.',
           '',
@@ -246,6 +259,13 @@ async function createSkillPlaybook(
             id: skill.id,
             name: skill.name,
             description: skill.description,
+            requiredBins: skill.requiredBins,
+            requiredParams: skill.requiredParams.map((param) => ({
+              key: param.key,
+              label: param.label,
+              description: param.description,
+              secret: param.secret,
+            })),
             contentPreview: skill.content.slice(0, 240),
           })),
         }),
@@ -266,7 +286,7 @@ async function generateSessionName(request: string): Promise<string> {
   return first.length <= 70 ? first : `${first.slice(0, 67)}...`;
 }
 
-function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDefinition[]): string {
+async function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDefinition[]): Promise<string> {
   // CRITICAL INVARIANT: Skills are NEVER callable tools. They are reference material injected
   // into the system prompt for strategy and workflow guidance only. The tools array must contain
   // ONLY built-in tools (read_file, write_file, terminal_command, http_request, web_search).
@@ -293,9 +313,17 @@ function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDefiniti
       .join('\n');
   });
 
+  // Build parameter documentation and skill-param associations
+  const allParams = dedupeParams(skills.flatMap((skill) => skill.requiredParams));
+  const paramDocumentation = buildParameterDocumentation(allParams, skills);
+
+  // Generate a tailored prompt based on the user's request
+  const tailoredPrompt = await generateTailoredPrompt(request, skills, tools);
+
   return [
     'You are an OpenForge agent.',
-    `Goal: ${request}`,
+    '',
+    tailoredPrompt,
     '',
     'Behavioral guidelines:',
     '- Act autonomously for clearly safe actions.',
@@ -306,16 +334,69 @@ function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDefiniti
     'Tools (executable capabilities):',
     ...toolLines,
     '',
-    'Workflow guides (reference material):',
+    'Your skills:',
     ...(skillBlocks.length > 0
       ? skillBlocks
       : ['No additional workflow guides are active. Use built-in tools and your judgment.']),
     '',
+    ...(paramDocumentation.length > 0
+      ? [
+          'Available Parameters:',
+          'The following parameters are pre-configured and automatically injected into tool calls.',
+          'Reference them in tool inputs using ${PARAM_NAME} format, and the runtime will resolve them.',
+          '',
+          ...paramDocumentation,
+        ]
+      : []),
+    '',
     'Important:',
     '- Tools are executable functions you can call.',
     '- Workflow guides are narrative instructions for strategy and best practices. You cannot call them—use them to inform your approach.',
+    '- Parameter placeholders (${PARAM_NAME}) are automatically resolved at runtime—do not modify them.',
     '- Always prefer the available tools over creating workarounds.',
   ].join('\n');
+}
+
+async function generateTailoredPrompt(request: string, skills: Skill[], tools: ToolDefinition[]): Promise<string> {
+  const client = await createLLMClient();
+  
+  const toolNames = tools.map((t) => t.name).join(', ');
+  const skillNames = skills.map((s) => `${s.name} (${s.description})`).join('\n  ');
+
+  const response = await client.complete(
+    [
+      createMessage(
+        'system',
+        [
+          '# Prompt Generator for Autonomous Agents',
+          '',
+          'You are a specialized prompt engineer. Your job is to generate a focused, actionable prompt section for an autonomous agent based on their mission and available capabilities.',
+          '',
+          'The output should be 2-3 paragraphs that:',
+          '1. Clearly articulate the core mission and any sub-goals',
+          '2. Highlight key challenges, constraints, and success criteria specific to this mission',
+          '3. Outline the strategic approach—which skills/tools are primary, what sequence is expected, decision points',
+          '4. Note any critical guardrails or risk mitigation measures',
+          '',
+          'Be specific and actionable. Reference the available skills and tools by name. The agent reading this should immediately understand what they need to accomplish and how.',
+          'Do NOT include generic advice. Focus exclusively on what makes this mission unique.',
+        ].join('\n'),
+      ),
+      createMessage(
+        'user',
+        JSON.stringify({
+          userRequest: request,
+          availableTools: toolNames,
+          availableSkills: skillNames.length > 0 ? skillNames : 'None',
+        }),
+      ),
+    ],
+    [],
+    false,
+  );
+
+  const resolved = assertNonStreamingResponse(response);
+  return resolved.text.trim();
 }
 
 function parseJsonSafely(raw: string): unknown {
@@ -347,4 +428,31 @@ function dedupeParams(params: RequiredParam[]): RequiredParam[] {
     map.set(param.key, param);
   }
   return [...map.values()];
+}
+
+function buildParameterDocumentation(allParams: RequiredParam[], skills: Skill[]): string[] {
+  if (allParams.length === 0) {
+    return [];
+  }
+
+  const lines: string[] = [];
+
+  for (const param of allParams) {
+    // Find which skills require this parameter
+    const skillsThatNeed = skills
+      .filter((skill) => skill.requiredParams.some((p) => p.key === param.key))
+      .map((skill) => skill.id);
+
+    const isSecret = param.secret ? '🔐' : '📌';
+    lines.push(`- ${isSecret} ${param.key}`);
+    if (param.description) {
+      lines.push(`  Description: ${param.description}`);
+    }
+    if (skillsThatNeed.length > 0) {
+      lines.push(`  Required by: ${skillsThatNeed.join(', ')}`);
+    }
+    lines.push('');
+  }
+
+  return lines;
 }

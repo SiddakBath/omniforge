@@ -35,5 +35,11 @@ export async function resolveParamValue(paramKey: string): Promise<string | unde
 
 export async function findMissingParams(requiredParams: RequiredParam[]): Promise<RequiredParam[]> {
   const store = await loadParamsStore();
-  return requiredParams.filter((param) => !(param.key in store.values) && !(param.key in store.secrets));
+  // Only return params that are truly required (required: true or undefined)
+  return requiredParams.filter(
+    (param) =>
+      (param.required !== false) && // Default to required if not specified
+      !(param.key in store.values) &&
+      !(param.key in store.secrets)
+  );
 }

@@ -370,7 +370,7 @@ function parseOneHunk(lines: string[], lineNumber: number): { hunk: Hunk; consum
       hunk: {
         kind: 'update',
         path: targetPath,
-        movePath,
+        ...(movePath ? { movePath } : {}),
         chunks,
       },
       consumed,
@@ -415,11 +415,14 @@ function parseUpdateFileChunk(
   }
 
   const chunk: UpdateFileChunk = {
-    changeContext,
     oldLines: [],
     newLines: [],
     isEndOfFile: false,
   };
+
+  if (changeContext !== undefined) {
+    chunk.changeContext = changeContext;
+  }
 
   let parsedLines = 0;
   for (const line of lines.slice(startIndex)) {

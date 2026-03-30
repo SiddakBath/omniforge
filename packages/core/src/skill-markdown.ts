@@ -49,10 +49,12 @@ function extractRequirements(skillName: string, metadata: Record<string, unknown
   }
 
   const requiredBins = asStringArray(requires.bins);
-  const envKeys = asStringArray(requires.env);
+  const requiredParamKeys = asStringArray(requires.params);
+  const optionalParamKeys = asStringArray(requires.optional);
+  const allParamKeys = [...requiredParamKeys, ...optionalParamKeys];
 
-  // Validate parameter keys follow environment variable naming convention
-  const invalidKeys = envKeys.filter((key) => !isValidParamKey(key));
+  // Validate parameter keys follow naming convention
+  const invalidKeys = allParamKeys.filter((key) => !isValidParamKey(key));
   if (invalidKeys.length > 0) {
     throw new Error(
       `Skill "${skillName}" has invalid parameter keys: ${invalidKeys.join(', ')}. ` +
@@ -60,14 +62,23 @@ function extractRequirements(skillName: string, metadata: Record<string, unknown
     );
   }
 
-  const requiredParams = envKeys.map((envKey) => ({
-    key: envKey,
-    label: envKey,
-    description: `Environment credential required by skill "${skillName}".`,
+  const requiredParams = requiredParamKeys.map((paramKey) => ({
+    key: paramKey,
+    label: paramKey,
+    description: `Credential required by skill "${skillName}".`,
     secret: true,
+    required: true,
   }));
 
-  return { requiredParams, requiredBins };
+  const optionalParams = optionalParamKeys.map((paramKey) => ({
+    key: paramKey,
+    label: paramKey,
+    description: `Optional credential for skill "${skillName}".`,
+    secret: true,
+    required: false,
+  }));
+
+  return { requiredParams: [...requiredParams, ...optionalParams], requiredBins };
 }
 
 export function parseSkillMarkdown(markdown: string, options?: { idHint?: string; createdAt?: string }): Skill {

@@ -13,6 +13,7 @@ const BUILTIN_CATALOG: ProviderCatalogEntry[] = [
     models: [
       { id: 'claude-sonnet-4-5', contextWindow: 200000, tags: ['reasoning', 'coding', 'tool-use', 'long-context'] },
       { id: 'claude-opus-4-1', contextWindow: 200000, tags: ['reasoning', 'analysis', 'tool-use'] },
+      { id: 'claude-haiku-4-5', contextWindow: 200000, tags: ['reasoning', 'creative', 'tool-use'] },
     ],
   },
   {
