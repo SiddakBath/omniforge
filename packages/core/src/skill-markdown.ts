@@ -81,13 +81,62 @@ function extractRequirements(skillName: string, metadata: Record<string, unknown
   return { requiredParams: [...requiredParams, ...optionalParams], requiredBins };
 }
 
+function sanitizeFrontmatter(frontmatter: string): string {
+  return frontmatter
+    .split(/\r?\n/)
+    .map((line) => {
+      const match = line.match(/^(\s*)(name|description|homepage)\s*:\s*(.*)$/);
+      if (!match) {
+        return line;
+      }
+
+      const [, indent, key, rawValue = ''] = match;
+      const trimmed = rawValue.trim();
+
+      // If value is empty, block scalar, already quoted, or appears to be structured metadata, leave it.
+      if (
+        trimmed === '' ||
+        /^(["'])(.*)\1$/.test(trimmed) ||
+        /^[>|]/.test(trimmed) ||
+        /^[\[{]/.test(trimmed)
+      ) {
+        return line;
+      }
+
+      // If the value contains unquoted colon, quote it.
+      if (trimmed.includes(':')) {
+        const escaped = JSON.stringify(trimmed);
+        return `${indent}${key}: ${escaped}`;
+      }
+
+      return line;
+    })
+    .join('\n');
+}
+
 export function parseSkillMarkdown(markdown: string, options?: { idHint?: string; createdAt?: string }): Skill {
   const match = markdown.match(FRONTMATTER_PATTERN);
   if (!match) {
     throw new Error('Skill markdown is missing YAML frontmatter.');
   }
 
-  const parsed = YAML.parse(match[1] ?? '') as unknown;
+  const rawFrontmatter = match[1] ?? '';
+  let parsed: unknown;
+
+  try {
+    parsed = YAML.parse(rawFrontmatter);
+  } catch (origError) {
+    const sanitized = sanitizeFrontmatter(rawFrontmatter);
+    try {
+      parsed = YAML.parse(sanitized);
+    } catch (sanitizedError) {
+      throw new Error(
+        `Skill frontmatter failed YAML parse. original error: ${origError}. ` +
+        `sanitized attempt error: ${sanitizedError}. Raw frontmatter:\n${rawFrontmatter}`,
+      );
+    }
+  }
+
   if (!isRecord(parsed)) {
     throw new Error('Skill frontmatter must be a YAML object.');
   }

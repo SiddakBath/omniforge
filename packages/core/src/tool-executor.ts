@@ -71,6 +71,7 @@ export class DefaultToolExecutor implements ToolExecutor {
     return value;
   }
 
+
   /**
    * Resolve parameter placeholders in a string.
    * Replaces ${PARAM_NAME} with the resolved param value from the params store.

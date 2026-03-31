@@ -352,7 +352,8 @@ async function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDe
     'Important:',
     '- Tools are executable functions you can call.',
     '- Workflow guides are narrative instructions for strategy and best practices. You cannot call them—use them to inform your approach.',
-    '- Parameter placeholders (${PARAM_NAME}) are automatically resolved at runtime—do not modify them.',
+    '- Skill parameters: use ${PARAM_NAME} to access injected credentials and params; do not use %PARAM_NAME% for skill params.',
+    '- Shell/OS environment variables: %VAR_NAME% is allowed when intentionally using local shell env vars, but is not how skill param injection works.',
     '- Always prefer the available tools over creating workarounds.',
   ].join('\n');
 }
