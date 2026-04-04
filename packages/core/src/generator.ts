@@ -7,7 +7,17 @@ import { assertNonStreamingResponse } from './llm.js';
 import { findMissingParams } from './params-store.js';
 import { parseSkillMarkdown } from './skill-markdown.js';
 import { listSkills, saveSkillBundle } from './skill-store.js';
-import type { AgentSession, RequiredParam, Skill, SkillAuditResult, SkillBundle, ToolDefinition } from './types.js';
+import { DefaultToolExecutor } from './tool-executor.js';
+import type {
+  AgentSession,
+  Message,
+  RequiredParam,
+  Skill,
+  SkillAuditResult,
+  SkillBundle,
+  ToolDefinition,
+  ToolExecutor,
+} from './types.js';
 
 const SkillAuditSchema = z.object({
   useSkillIds: z.array(z.string()).default([]),
@@ -33,10 +43,17 @@ export interface GenerateAgentOutput {
   missingParams: RequiredParam[];
 }
 
+const SKILL_RESEARCH_MAX_STEPS = 6;
+
 export async function generateAgentSession(input: GenerateAgentInput): Promise<GenerateAgentOutput> {
   const client = await createLLMClient(input.provider, input.model);
   const existingSkills = await listSkills();
   const builtInTools = getBuiltinToolDefinitions();
+  const skillResearchTools = builtInTools.filter((tool) => tool.name === 'web_search');
+  const skillResearchExecutor = new DefaultToolExecutor(process.cwd(), {
+    ...(input.provider ? { provider: input.provider } : {}),
+    ...(input.model ? { model: input.model } : {}),
+  });
 
   console.log('\n📊 Step 1/3 — Auditing skills...');
   console.log(`  Analyzing request: "${input.request}"\n`);
@@ -58,7 +75,15 @@ export async function generateAgentSession(input: GenerateAgentInput): Promise<G
     for (let i = 0; i < audit.createSkills.length; i++) {
       const needed = audit.createSkills[i]!;
       console.log(`  [${i + 1}/${audit.createSkills.length}] Generating "${needed.name}"...`);
-      const bundle = await createSkillPlaybook(client, input.request, needed.name, needed.description, existingSkills);
+      const bundle = await createSkillPlaybook(
+        client,
+        input.request,
+        needed.name,
+        needed.description,
+        existingSkills,
+        skillResearchTools,
+        skillResearchExecutor,
+      );
       console.log('        ✓ Generated markdown playbook');
       const saved = await saveSkillBundle(bundle);
       created.push(saved);
@@ -183,24 +208,32 @@ async function createSkillPlaybook(
   skillName: string,
   description: string,
   existingSkills: Skill[],
+  researchTools: ToolDefinition[],
+  toolExecutor: ToolExecutor,
 ): Promise<SkillBundle> {
   console.log('      • Calling LLM to generate markdown skill...');
 
-  const response = await client.complete(
-    [
-      createMessage(
-        'system',
-        [
+  const messages: Message[] = [
+    createMessage(
+      'system',
+      [
           '# Skill Generator',
           '',
           'Generate a powerful, reusable skill for autonomous agents.',
           'Skills encode domain expertise and integration workflows. They are NOT generic advice.',
           '',
+          'Research guidance (conditional, not mandatory):',
+          '- Use web_search ONLY if this skill requires integration with external tools/APIs AND no existing skill already covers these capabilities.',
+          '- Example: If creating a "GitHub PR Manager" skill, search for current GitHub API endpoints and authentication methods.',
+          '- Example: If creating a workflow that reuses existing skill capabilities, web_search may not be necessary.',
+          '- When researching: Find recent, practical information about tool/API surfaces, CLI tools, and integration patterns.',
+          '- You may run multiple web_search calls within the generation loop to gather information incrementally.',
+          '',
           'Design principles:',
           '- **Service-integrated**: Connect to external platforms (Gmail, GitHub, Slack, Google Drive).',
           '- **Multi-step workflows**: Break complex tasks into clear phases with decision gates.',
           '- **Risk-aware**: Identify approval points, validation steps, and error recovery.',
-          '- **Tool-integrated**: Reference built-in tools (http_request, terminal_command, read_file) for API calls and data handling.',
+          '- **Tool-integrated**: Reference built-in tools (web_search, http_request, terminal_command, read_file) for research, API calls, and data handling.',
           '- **Reusable**: Design for multiple use cases within the domain, not one-off tasks.',
           '',
           'Structure your skill:',
@@ -249,33 +282,65 @@ async function createSkillPlaybook(
           '- Body: practical workflow guide with clear phases and decision logic.',
         ].join('\n'),
       ),
-      createMessage(
-        'user',
-        JSON.stringify({
-          request,
-          skillName,
-          description,
-          existingSkills: existingSkills.map((skill) => ({
-            id: skill.id,
-            name: skill.name,
-            description: skill.description,
-            requiredBins: skill.requiredBins,
-            requiredParams: skill.requiredParams.map((param) => ({
-              key: param.key,
-              label: param.label,
-              description: param.description,
-              secret: param.secret,
-            })),
-            contentPreview: skill.content.slice(0, 240),
+    createMessage(
+      'user',
+      JSON.stringify({
+        request,
+        skillName,
+        description,
+        availableResearchTools: researchTools.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+        })),
+        existingSkills: existingSkills.map((skill) => ({
+          id: skill.id,
+          name: skill.name,
+          description: skill.description,
+          requiredBins: skill.requiredBins,
+          requiredParams: skill.requiredParams.map((param) => ({
+            key: param.key,
+            label: param.label,
+            description: param.description,
+            secret: param.secret,
           })),
-        }),
-      ),
-    ],
-    [],
-    false,
-  );
-  const resolved = assertNonStreamingResponse(response);
-  const rawMarkdown = resolved.text.trim();
+          contentPreview: skill.content.slice(0, 240),
+        })),
+      }),
+    ),
+  ];
+
+  let rawMarkdown = '';
+
+  for (let step = 0; step < SKILL_RESEARCH_MAX_STEPS; step++) {
+    const response = await client.complete(messages, researchTools, false);
+    const resolved = assertNonStreamingResponse(response);
+
+    if (resolved.text.trim()) {
+      rawMarkdown = resolved.text.trim();
+      messages.push(createMessage('assistant', rawMarkdown));
+    }
+
+    if (resolved.toolCalls.length === 0) {
+      break;
+    }
+
+    for (const toolCall of resolved.toolCalls) {
+      const result = await toolExecutor.execute(toolCall);
+      const toolMessage: Message = {
+        id: randomUUID(),
+        role: 'tool',
+        name: toolCall.name,
+        toolCallId: toolCall.id,
+        content: JSON.stringify({ ok: result.ok, output: result.output }),
+        createdAt: new Date().toISOString(),
+      };
+      messages.push(toolMessage);
+    }
+  }
+
+  if (!rawMarkdown.trim()) {
+    throw new Error('Skill generation returned no markdown content.');
+  }
 
   const skill = parseSkillMarkdown(rawMarkdown, { idHint: skillName });
   return { skill, markdown: rawMarkdown };
