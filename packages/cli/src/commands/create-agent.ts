@@ -40,8 +40,9 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   const config = await loadConfig();
   const webSearchStatus = getWebSearchStatus(config);
   if (!webSearchStatus.available) {
-    console.log('ℹ️  Web search is currently unavailable.');
-    console.log('   Skills and agent runs can proceed, but live web research will be limited.');
+    console.log('⚠️  Web search is currently unavailable.');
+    console.log('   This will limit the quality of skill creation and agent generation.');
+    console.log('   Skills won\'t be able to research topics, and agents will lack web research capabilities.');
     console.log('   Run "openforge config" to enable web search and save a key.\n');
   }
   const catalog = await loadProviderCatalog();

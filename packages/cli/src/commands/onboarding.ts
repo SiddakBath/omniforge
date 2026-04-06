@@ -154,7 +154,7 @@ export async function runOnboardingCommand(): Promise<void> {
     }
 
     const webSearchSummary = enableWebSearch
-      ? `${webSearchProvider ?? '(provider not set)}`
+      ? `${webSearchProvider ?? '(provider not set)'}`
       : 'disabled';
 
     const shouldSave = await confirm({
