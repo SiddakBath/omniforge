@@ -1,6 +1,6 @@
 export type Role = 'system' | 'user' | 'assistant' | 'tool';
 
-/** Canonical chat message persisted inside a session. */
+/** Canonical chat message persisted inside an agent. */
 export interface Message {
   id: string;
   role: Role;
@@ -56,16 +56,25 @@ export interface Checkpoint {
   id: string;
   messageCount: number;
   createdAt: string;
-  status: AgentSession['status'];
+  status: Agent['status'];
 }
 
-/** Full persisted agent session record. */
-export interface AgentSession {
+export interface AgentSchedule {
+  enabled: boolean;
+  dailyTime: string; // HH:mm in agent timezone
+  timezone: string; // IANA timezone
+  prompt?: string;
+  nextRunAt?: string; // ISO-8601 UTC timestamp
+  lastRunAt?: string; // ISO-8601 UTC timestamp
+}
+
+/** Full persisted agent state record. */
+export interface Agent {
   id: string;
   name: string;
   description: string;
-  systemPrompt: string;
   skills: string[];
+  schedule?: AgentSchedule;
   provider: string;
   model: string;
   status: 'ready' | 'running' | 'paused' | 'complete' | 'error';
@@ -91,12 +100,21 @@ export interface ProviderCatalogEntry {
   models: ProviderModel[];
 }
 
+export type WebSearchProvider = 'brave' | 'perplexity' | 'gemini' | 'grok' | 'kimi';
+
+export interface WebSearchConfig {
+  enabled: boolean;
+  provider: WebSearchProvider | '';
+  providers: Partial<Record<WebSearchProvider, { apiKey: string }>>;
+}
+
 export interface OpenForgeConfig {
   generator: {
     provider: string;
     model: string;
   };
   providers: Record<string, { apiKey: string }>;
+  webSearch: WebSearchConfig;
 }
 
 export interface ParamsStore {

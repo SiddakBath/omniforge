@@ -7,6 +7,11 @@ interface ExecutorContext {
   model?: string | undefined;
   apiKey?: string | undefined;
   baseUrl?: string | undefined;
+  webSearch?: {
+    enabled: boolean;
+    provider?: string;
+    providers: Record<string, { apiKey: string }>;
+  };
 }
 
 export class DefaultToolExecutor implements ToolExecutor {
@@ -22,6 +27,7 @@ export class DefaultToolExecutor implements ToolExecutor {
       ...(this._context.model ? { model: this._context.model } : {}),
       ...(this._context.apiKey ? { apiKey: this._context.apiKey } : {}),
       ...(this._context.baseUrl ? { baseUrl: this._context.baseUrl } : {}),
+      ...(this._context.webSearch ? { webSearch: this._context.webSearch } : {}),
     };
 
     // Resolve parameter placeholders in tool call input before execution

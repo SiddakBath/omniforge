@@ -1,10 +1,12 @@
 import { randomUUID } from 'crypto';
 import { assertNonStreamingResponse } from './llm.js';
-import { checkpointSession, saveSession } from './session-store.js';
-import type { AgentSession, LLMClient, Message, ToolDefinition, ToolExecutor, ToolCall, ToolExecutionResult } from './types.js';
+import { checkpointAgent, loadAgentSystemPrompt, saveAgent } from './agent-store.js';
+import type { Agent, LLMClient, Message, ToolDefinition, ToolExecutor, ToolCall, ToolExecutionResult } from './types.js';
+
+const DEFAULT_MAX_CONTEXT_MESSAGES = 60;
 
 export interface RunTurnOptions {
-  session: AgentSession;
+  agent: Agent;
   userInput?: string;
   client: LLMClient;
   toolExecutor: ToolExecutor;
@@ -15,18 +17,21 @@ export interface RunTurnOptions {
   onToolResult?: (toolCall: ToolCall, result: ToolExecutionResult) => void;
 }
 
-export async function runAgentTurn(options: RunTurnOptions): Promise<AgentSession> {
-  let session: AgentSession = {
-    ...options.session,
+export async function runAgentTurn(options: RunTurnOptions): Promise<Agent> {
+  let agent: Agent = {
+    ...options.agent,
     status: 'running',
+    messages: truncateHistory(options.agent.messages),
   };
+  const systemPrompt = await loadAgentSystemPrompt(agent.id);
 
   if (options.userInput) {
-    session.messages.push(createMessage('user', options.userInput));
+    agent.messages = pushAndTruncate(agent.messages, createMessage('user', options.userInput));
   } else {
-    const hasConversationalMessage = session.messages.some((message) => message.role !== 'system');
+    const hasConversationalMessage = agent.messages.length > 0;
     if (!hasConversationalMessage) {
-      session.messages.push(
+      agent.messages = pushAndTruncate(
+        agent.messages,
         createMessage(
           'user',
           'Begin working on the goal from the system prompt. First provide a concise plan, then take the first action.',
@@ -36,19 +41,19 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<AgentSessio
   }
 
   while (true) {
-    const response = await options.client.complete(session.messages, options.tools, false);
+    const response = await options.client.complete(buildContextMessages(systemPrompt, agent.messages), options.tools, false);
     const resolved = assertNonStreamingResponse(response);
 
     if (resolved.text.trim()) {
-      session.messages.push(createMessage('assistant', resolved.text));
+      agent.messages = pushAndTruncate(agent.messages, createMessage('assistant', resolved.text));
       options.onTextDelta?.(resolved.text);
     }
 
     if (resolved.toolCalls.length === 0) {
-      session.status = 'ready';
-      session = checkpointSession(session);
-      await saveSession(session);
-      return session;
+      agent.status = 'ready';
+      agent = checkpointAgent(agent);
+      await saveAgent(agent);
+      return agent;
     }
 
     for (const toolCall of resolved.toolCalls) {
@@ -75,9 +80,31 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<AgentSessio
         content,
         createdAt: new Date().toISOString(),
       };
-      session.messages.push(toolMessage);
+      agent.messages = pushAndTruncate(agent.messages, toolMessage);
     }
   }
+}
+
+function buildContextMessages(systemPrompt: string, history: Message[]): Message[] {
+  return [createMessage('system', systemPrompt), ...truncateHistory(history)];
+}
+
+function pushAndTruncate(history: Message[], message: Message): Message[] {
+  return truncateHistory([...history, message]);
+}
+
+function truncateHistory(history: Message[]): Message[] {
+  const maxMessages = resolveMaxContextMessages();
+  const nonSystem = history.filter((message) => message.role !== 'system');
+  return nonSystem.slice(-maxMessages);
+}
+
+function resolveMaxContextMessages(): number {
+  const parsed = Number(process.env.OPENFORGE_MAX_CONTEXT_MESSAGES ?? DEFAULT_MAX_CONTEXT_MESSAGES);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return DEFAULT_MAX_CONTEXT_MESSAGES;
+  }
+  return Math.floor(parsed);
 }
 
 export function createMessage(role: Message['role'], content: string): Message {

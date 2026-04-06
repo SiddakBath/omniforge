@@ -330,7 +330,21 @@ function resolveBraveMode(): BraveMode {
   return mode === 'llm-context' ? 'llm-context' : 'web';
 }
 
+function getConfiguredWebSearchKey(provider: SearchProvider, context: BuiltinToolContext): string | undefined {
+  const configured = context.webSearch?.providers?.[provider]?.apiKey?.trim();
+  return configured || undefined;
+}
+
+function isWebSearchConfigEnabled(context: BuiltinToolContext): boolean {
+  return Boolean(context.webSearch?.enabled);
+}
+
 function getProviderKey(provider: SearchProvider, context: BuiltinToolContext): string | undefined {
+  const configuredKey = getConfiguredWebSearchKey(provider, context);
+  if (configuredKey) {
+    return configuredKey;
+  }
+
   if (provider === 'brave') {
     return process.env.BRAVE_API_KEY;
   }
@@ -939,11 +953,12 @@ function normalizeDomainFilter(raw: unknown): string[] | undefined {
 
 function missingKeyError(provider?: SearchProvider): string {
   if (provider) {
-    return `web_search provider "${provider}" is selected, but no API key was found. Set the relevant environment variable and retry.`;
+    return `web_search provider "${provider}" is selected, but no API key was found. Run "openforge config" to enable web search and save a provider key, or set the matching environment variable.`;
   }
   return [
     'No web search provider API key was found.',
-    'Set at least one of: BRAVE_API_KEY, PERPLEXITY_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, XAI_API_KEY, KIMI_API_KEY, MOONSHOT_API_KEY.',
+    'Configure web search in OpenForge config by running "openforge config".',
+    'Or set at least one of: BRAVE_API_KEY, PERPLEXITY_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, XAI_API_KEY, KIMI_API_KEY, MOONSHOT_API_KEY.',
     'If your active model has native web search, ask it to use native search directly instead of the web_search tool.',
   ].join(' ');
 }
@@ -1006,7 +1021,8 @@ export const webSearchTool: BuiltinToolSpec = {
       return { ok: false, output: 'query is required' };
     }
 
-    const selectedProvider = normalizeProvider(call.input.provider ?? process.env.WEB_SEARCH_PROVIDER);
+    const configuredProvider = isWebSearchConfigEnabled(context) ? context.webSearch?.provider : undefined;
+    const selectedProvider = normalizeProvider(call.input.provider ?? configuredProvider ?? process.env.WEB_SEARCH_PROVIDER);
     const credentials = resolveCredentials(selectedProvider, context);
 
     if (!credentials) {

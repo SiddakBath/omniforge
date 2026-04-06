@@ -4,7 +4,11 @@
     "outDir": "dist",
     "rootDir": "src",
     "jsx": "react-jsx",
-    "types": ["node", "react"]
+    "types": ["node", "react"],
+    "baseUrl": ".",
+    "paths": {
+      "@openforge/core": ["../core/src/index.ts"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"]
 }

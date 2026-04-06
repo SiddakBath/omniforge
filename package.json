@@ -1,8 +1,22 @@
 {
   "name": "openforge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
-  "description": "OpenForge monorepo",
+  "license": "MIT",
+  "description": "Local-first, open-source agentic framework. Build and run AI agents from natural language.",
+  "author": "OpenForge contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openforge/openforge"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "framework",
+    "local-first",
+    "automation",
+    "llm"
+  ],
   "packageManager": "npm@10.8.2",
   "workspaces": [
     "packages/*"
@@ -10,7 +24,12 @@
   "scripts": {
     "build": "npm run --workspaces build",
     "dev": "npm run -w @openforge/cli dev",
+    "dev:cli": "npm run -w @openforge/cli dev",
+    "check": "npm run build && npm run lint && npm run typecheck",
     "lint": "npm run --workspaces lint",
+    "release:check": "npm run check && npm audit --omit=dev",
+    "release:pack": "npm pack --dry-run -w @openforge/core && npm pack --dry-run -w @openforge/cli",
+    "test": "npm run --workspaces --if-present test",
     "typecheck": "npm run --workspaces typecheck"
   },
   "devDependencies": {

@@ -6,22 +6,34 @@ export const OPENFORGE_HOME = path.join(homedir(), '.openforge');
 export const OPENFORGE_SKILLS_DIR = path.join(OPENFORGE_HOME, 'skills');
 export const OPENFORGE_CONFIG_FILE = path.join(OPENFORGE_HOME, 'config.json');
 export const OPENFORGE_PARAMS_FILE = path.join(OPENFORGE_HOME, 'params.json');
-export const OPENFORGE_SESSIONS_DIR = path.join(OPENFORGE_HOME, 'sessions');
+export const OPENFORGE_AGENTS_DIR = path.join(OPENFORGE_HOME, 'agents');
 
-export function getSessionDataDir(sessionId: string): string {
-  return path.join(OPENFORGE_SESSIONS_DIR, `${sessionId}-data`);
+export function getAgentDir(agentId: string): string {
+  return path.join(OPENFORGE_AGENTS_DIR, agentId);
+}
+
+export function getAgentStateFile(agentId: string): string {
+  return path.join(getAgentDir(agentId), 'agent.json');
+}
+
+export function getAgentSystemPromptFile(agentId: string): string {
+  return path.join(getAgentDir(agentId), 'system-prompt.md');
+}
+
+export function getAgentDataDir(agentId: string): string {
+  return path.join(getAgentDir(agentId), 'data');
 }
 
 export async function ensureOpenForgeDirs(): Promise<void> {
   await Promise.all([
     mkdir(OPENFORGE_HOME, { recursive: true }),
     mkdir(OPENFORGE_SKILLS_DIR, { recursive: true }),
-    mkdir(OPENFORGE_SESSIONS_DIR, { recursive: true }),
+    mkdir(OPENFORGE_AGENTS_DIR, { recursive: true }),
   ]);
 }
 
-export async function ensureSessionDataDir(sessionId: string): Promise<string> {
-  const dir = getSessionDataDir(sessionId);
+export async function ensureAgentDataDir(agentId: string): Promise<string> {
+  const dir = getAgentDataDir(agentId);
   await mkdir(dir, { recursive: true });
   return dir;
 }

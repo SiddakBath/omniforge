@@ -1,12 +1,19 @@
 {
   "name": "@openforge/cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
+  "license": "MIT",
   "bin": {
     "openforge": "dist/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx src/index.ts",
@@ -15,7 +22,7 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.3.2",
-    "@openforge/core": "0.1.0",
+    "@openforge/core": "0.1.1",
     "commander": "^13.1.0",
     "ink": "^6.8.0",
     "react": "^19.0.0"

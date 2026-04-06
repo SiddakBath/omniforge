@@ -7,11 +7,42 @@ const DEFAULT_CONFIG: OpenForgeConfig = {
     model: '',
   },
   providers: {},
+  webSearch: {
+    enabled: false,
+    provider: '',
+    providers: {},
+  },
 };
+
+function normalizeConfig(raw: OpenForgeConfig): OpenForgeConfig {
+  const webSearchRaw = raw.webSearch;
+  const provider = typeof webSearchRaw?.provider === 'string' ? webSearchRaw.provider : '';
+  const providerEntries = webSearchRaw?.providers ?? {};
+  const providers = Object.fromEntries(
+    Object.entries(providerEntries)
+      .filter(([, value]) => Boolean(value?.apiKey?.trim()))
+      .map(([key, value]) => [key, { apiKey: value!.apiKey.trim() }]),
+  ) as OpenForgeConfig['webSearch']['providers'];
+
+  return {
+    ...raw,
+    generator: {
+      provider: raw.generator?.provider ?? '',
+      model: raw.generator?.model ?? '',
+    },
+    providers: raw.providers ?? {},
+    webSearch: {
+      enabled: Boolean(webSearchRaw?.enabled),
+      provider,
+      providers,
+    },
+  };
+}
 
 export async function loadConfig(): Promise<OpenForgeConfig> {
   await ensureOpenForgeDirs();
-  return readJsonFile<OpenForgeConfig>(OPENFORGE_CONFIG_FILE, DEFAULT_CONFIG);
+  const loaded = await readJsonFile<OpenForgeConfig>(OPENFORGE_CONFIG_FILE, DEFAULT_CONFIG);
+  return normalizeConfig(loaded);
 }
 
 export async function saveConfig(config: OpenForgeConfig): Promise<void> {
@@ -22,4 +53,39 @@ export async function saveConfig(config: OpenForgeConfig): Promise<void> {
 export async function isOnboarded(): Promise<boolean> {
   const config = await loadConfig();
   return Boolean(config.generator.provider && config.generator.model);
+}
+
+export function getWebSearchStatus(config: OpenForgeConfig): {
+  available: boolean;
+  provider?: string;
+  reason?: string;
+} {
+  if (!config.webSearch.enabled) {
+    return {
+      available: false,
+      reason: 'Web search is disabled in config.',
+    };
+  }
+
+  const provider = config.webSearch.provider;
+  if (!provider) {
+    return {
+      available: false,
+      reason: 'Web search provider is not configured.',
+    };
+  }
+
+  const configuredKey = config.webSearch.providers[provider]?.apiKey?.trim();
+  if (!configuredKey) {
+    return {
+      available: false,
+      provider,
+      reason: `No API key is saved for web search provider ${provider}.`,
+    };
+  }
+
+  return {
+    available: true,
+    provider,
+  };
 }

@@ -11,31 +11,48 @@
   1. Skill audit
   2. Skill markdown generation (workflow guides)
   3. Required parameter enforcement
-  4. Agent session assembly
-- **Storage layer** for config, params, skills, and sessions
+  4. Agent assembly
+- **Storage layer** for config, params, skills, and agents
 
 ### `packages/cli`
 
 - Onboarding wizard
 - Agent creation flow
-- Session resume flow
+- Agent resume flow
 - Skill and settings views
 
-### `packages/web`
-
-- Local Next.js app mirroring CLI capabilities
-- API routes calling core services directly
-- Dark minimal UX with session sidebar flow
-
-## Session lifecycle
+## Agent lifecycle
 
 1. User describes requested automation.
 2. Generator chooses existing/new skills (workflow guides).
 3. Missing required params are blocked until filled.
-4. Session system prompt is assembled with tools and skills injected separately.
-5. Session is assembled and persisted.
+4. Agent system prompt is assembled with tools and skills injected separately.
+5. Agent state and prompt are persisted in the agent folder.
 6. Agent runtime executes loop with tool calls.
 7. Checkpoint written at end of each completed turn.
+
+## Persistence model (`~/.openforge`)
+
+- `config.json`
+- `params.json`
+- `skills/<skill-id>/SKILL.md`
+- `agents/<agent-id>/agent.json`
+- `agents/<agent-id>/system-prompt.md`
+- `agents/<agent-id>/data/`
+
+## Context management
+
+- Runtime sends only the most recent non-system messages (bounded context window).
+- The system prompt is always injected as the first message from `system-prompt.md`.
+- Max message count is configurable via `OPENFORGE_MAX_CONTEXT_MESSAGES` (default `60`).
+
+## Scheduling
+
+- Agents can define an optional daily schedule (`HH:mm` + IANA timezone + optional prompt).
+- A long-running CLI scheduler (`openforge scheduler`) polls due agents and executes one turn.
+- Schedule metadata is stored in `agents/<agent-id>/agent.json` and updated after each run:
+  - `nextRunAt` (UTC)
+  - `lastRunAt` (UTC)
 
 ## Design constraints
 

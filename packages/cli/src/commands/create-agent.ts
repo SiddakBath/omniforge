@@ -3,22 +3,24 @@ import {
   DefaultToolExecutor,
   findMissingSkillBins,
   findMissingParams,
-  generateAgentSession,
+  generateAgent,
   getBuiltinToolDefinitions,
+  getWebSearchStatus,
   getProviderById,
   listSkills,
   loadConfig,
   loadProviderCatalog,
   runAgentTurn,
+  ensureAgentDataDir,
   saveConfig,
+  saveAgent,
+  saveAgentSystemPrompt,
   saveParamValue,
-  saveSession,
-  ensureSessionDataDir,
 } from '@openforge/core';
 import { input, password, select } from '@inquirer/prompts';
 import { promptConfirm } from '../utils/interactive.js';
 import { displayBanner } from '../utils/banner.js';
-import { runInteractiveSession } from './sessions.js';
+import { configureAgentScheduleInteractive, runInteractiveAgent } from './agents.js';
 
 export async function runCreateAgentCommand(initialRequest: string): Promise<void> {
   displayBanner();
@@ -36,6 +38,12 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   }
 
   const config = await loadConfig();
+  const webSearchStatus = getWebSearchStatus(config);
+  if (!webSearchStatus.available) {
+    console.log('ℹ️  Web search is currently unavailable.');
+    console.log('   Skills and agent runs can proceed, but live web research will be limited.');
+    console.log('   Run "openforge config" to enable web search and save a key.\n');
+  }
   const catalog = await loadProviderCatalog();
 
   let provider = await select({
@@ -94,13 +102,13 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
     break;
   }
 
-  console.log('\nGenerating agent session...');
+  console.log('\nGenerating agent...');
 
-  const output = await generateAgentSession({ request, provider, model });
+  const output = await generateAgent({ request, provider, model });
 
-  const assignedSkills = (await listSkills()).filter((skill: { id: string }) => output.session.skills.includes(skill.id));
+  const assignedSkills = (await listSkills()).filter((skill: { id: string }) => output.agent.skills.includes(skill.id));
 
-  console.log('\n✅ Session generated with assigned skills:');
+  console.log('\n✅ Agent generated with assigned skills:');
   assignedSkills.forEach((skill: { id: string; name: string; description?: string; requiredBins: string[] }) => {
     console.log(`  • ${skill.id}`);
     if (skill.description) {
@@ -181,13 +189,17 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
 
   console.log('✅ All skill parameters configured successfully.\n');
 
-  await saveSession(output.session);
+  await saveAgentSystemPrompt(output.agent.id, output.systemPrompt);
+  await saveAgent(output.agent);
+
+  console.log('Step 5/7 — Configure optional daily schedule.\n');
+  let createdAgent = await configureAgentScheduleInteractive(output.agent);
 
   const providerConfig = config.providers[provider];
   const apiKeyNeeded = !providerConfig?.apiKey;
   if (apiKeyNeeded) {
     const apiKey = await password({
-      message: `Step 5/6 — Enter ${providerEntry.name} API key`,
+      message: `Step 6/7 — Enter ${providerEntry.name} API key`,
       mask: '*',
       validate: (v) => (v.trim().length > 0 ? true : 'API key is required.'),
     });
@@ -195,32 +207,47 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
     await saveConfig(config);
     console.log('✅ API key saved.\n');
   } else {
-    console.log(`Step 5/6 — ✅ Using existing ${providerEntry.name} API key.\n`);
+    console.log(`Step 6/7 — ✅ Using existing ${providerEntry.name} API key.\n`);
   }
 
   const client = await createLLMClient(provider, model);
   
-  // Ensure session data directory exists for agent to write files to
-  const sessionDataDir = await ensureSessionDataDir(output.session.id);
+  // Ensure agent data directory exists for agent to write files to
+  const agentDataDir = await ensureAgentDataDir(createdAgent.id);
   
-  const executor = new DefaultToolExecutor(sessionDataDir, {
+  const executor = new DefaultToolExecutor(agentDataDir, {
     provider,
     model,
     apiKey: config.providers[provider]?.apiKey,
+    webSearch: {
+      enabled: config.webSearch.enabled,
+      ...(config.webSearch.provider ? { provider: config.webSearch.provider } : {}),
+      providers: Object.fromEntries(
+        Object.entries(config.webSearch.providers)
+          .filter(([, value]) => Boolean(value?.apiKey?.trim()))
+          .map(([providerId, value]) => [providerId, { apiKey: value!.apiKey.trim() }]),
+      ),
+    },
   });
   const tools = getBuiltinToolDefinitions();
 
-  console.log(`Step 5a/6 — Initializing ${tools.length} built-in tools:\n`);
+  console.log(`Step 6a/7 — Initializing ${tools.length} built-in tools:\n`);
   tools.forEach((tool: { name: string; description?: string }) => {
     console.log(`  • ${tool.name}${tool.description ? ` - ${tool.description}` : ''}`);
   });
   console.log('');
 
-  console.log('Step 6/6 — Running first agent turn...\n');
+  console.log('Step 7/7 — Running first agent turn...\n');
 
-  const session = await runAgentTurn({
-    session: output.session,
-    userInput: request,
+  // Generate an operational prompt for the first turn instead of using the creation request.
+  // The creation request describes what the agent should be (e.g., "an agent that swing trades"),
+  // not what it should do now. This prevents the agent from trying to set itself up or generate
+  // something instead of executing its actual mission.
+  const firstTurnPrompt = 'Execute your mission now. Proceed with your full workflow and report results.';
+
+  const agent = await runAgentTurn({
+    agent: createdAgent,
+    userInput: firstTurnPrompt,
     client,
     toolExecutor: executor,
     tools,
@@ -251,12 +278,12 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   });
 
   console.log('\n\n✅ Agent created successfully.');
-  console.log(`Session ID: ${session.id}`);
-  console.log(`Status: ${session.status}`);
+  console.log(`Agent ID: ${agent.id}`);
+  console.log(`Status: ${agent.status}`);
   console.log(`Provider: ${providerEntry.name}`);
   console.log(`Model: ${model}`);
   console.log(`Skills: ${assignedSkills.map((s: { id: string }) => s.id).join(', ')}`);
   console.log(`Tools: ${tools.map((t: { name: string }) => t.name).join(', ')}`);
-  console.log('\nEntering interactive session now...');
-  await runInteractiveSession(session);
+  console.log('\nEntering interactive agent loop now...');
+  await runInteractiveAgent(agent);
 }

@@ -13,5 +13,5 @@ Expected generator behavior:
    - `GMAIL_CLIENT_SECRET`
    - `GMAIL_REFRESH_TOKEN`
    - `USER_VOICE_EXAMPLES`
-4. Build session system prompt with all skill instruction blocks.
+4. Build agent system prompt with all skill instruction blocks.
 5. Start runtime loop once params are satisfied.

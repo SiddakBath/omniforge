@@ -52,6 +52,41 @@ function SettingsView({ config }: { config: any }) {
       }
     ),
     React.createElement(
+      Section,
+      {
+        title: 'Web Search',
+        children: React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            Text,
+            null,
+            'Enabled: ',
+            React.createElement(Text, { color: config.webSearch?.enabled ? 'green' : 'yellow', bold: true },
+              config.webSearch?.enabled ? 'yes' : 'no'
+            )
+          ),
+          React.createElement(
+            Text,
+            null,
+            'Provider: ',
+            React.createElement(Text, { color: 'cyan', bold: true }, config.webSearch?.provider || '(not set)')
+          ),
+          React.createElement(
+            Text,
+            null,
+            'Saved keys: ',
+            React.createElement(
+              Text,
+              { color: 'cyan', bold: true },
+              Object.keys(config.webSearch?.providers ?? {}).length
+            )
+          ),
+          React.createElement(Text, { color: 'gray' }, 'Use "openforge config" to update these settings.')
+        ),
+      }
+    ),
+    React.createElement(
       Box,
       { marginTop: 2 },
       React.createElement(Text, { color: 'gray' }, '💾 Configuration stored at ~/.openforge/config.json')

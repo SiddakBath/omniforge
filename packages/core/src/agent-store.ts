@@ -1,0 +1,75 @@
+import { mkdir, readdir, readFile, writeFile } from 'fs/promises';
+import { randomUUID } from 'crypto';
+import path from 'path';
+import {
+  ensureOpenForgeDirs,
+  getAgentDir,
+  getAgentStateFile,
+  getAgentSystemPromptFile,
+  OPENFORGE_AGENTS_DIR,
+} from './paths.js';
+import type { Agent, Checkpoint } from './types.js';
+
+export async function saveAgent(agent: Agent): Promise<void> {
+  await ensureOpenForgeDirs();
+  await mkdir(getAgentDir(agent.id), { recursive: true });
+  const target = getAgentStateFile(agent.id);
+  await writeFile(target, `${JSON.stringify(agent, null, 2)}\n`, 'utf8');
+}
+
+export async function loadAgent(agentId: string): Promise<Agent | undefined> {
+  await ensureOpenForgeDirs();
+  try {
+    const raw = await readFile(getAgentStateFile(agentId), 'utf8');
+    return JSON.parse(raw) as Agent;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function listAgents(): Promise<Agent[]> {
+  await ensureOpenForgeDirs();
+  const agents: Agent[] = [];
+
+  const agentEntries = await readdir(OPENFORGE_AGENTS_DIR, { withFileTypes: true });
+  for (const entry of agentEntries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    try {
+      const raw = await readFile(path.join(OPENFORGE_AGENTS_DIR, entry.name, 'agent.json'), 'utf8');
+      const agent = JSON.parse(raw) as Agent;
+      agents.push(agent);
+    } catch {
+      // Ignore malformed or partial entries.
+    }
+  }
+
+  return agents.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+}
+
+export async function saveAgentSystemPrompt(agentId: string, systemPrompt: string): Promise<void> {
+  await ensureOpenForgeDirs();
+  await mkdir(getAgentDir(agentId), { recursive: true });
+  await writeFile(getAgentSystemPromptFile(agentId), systemPrompt, 'utf8');
+}
+
+export async function loadAgentSystemPrompt(agentId: string): Promise<string> {
+  await ensureOpenForgeDirs();
+  return readFile(getAgentSystemPromptFile(agentId), 'utf8');
+}
+
+export function checkpointAgent(agent: Agent): Agent {
+  const checkpoint: Checkpoint = {
+    id: randomUUID(),
+    createdAt: new Date().toISOString(),
+    messageCount: agent.messages.length,
+    status: agent.status,
+  };
+
+  return {
+    ...agent,
+    checkpoints: [...agent.checkpoints, checkpoint],
+    updatedAt: checkpoint.createdAt,
+  };
+}

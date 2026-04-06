@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { createMessage } from './agent-runtime.js';
 import { getBuiltinToolDefinitions } from './builtin-tools/registry.js';
+import { getWebSearchStatus, loadConfig } from './config-store.js';
 import { createLLMClient } from './llm-factory.js';
 import { assertNonStreamingResponse } from './llm.js';
 import { findMissingParams } from './params-store.js';
@@ -9,7 +10,7 @@ import { parseSkillMarkdown } from './skill-markdown.js';
 import { listSkills, saveSkillBundle } from './skill-store.js';
 import { DefaultToolExecutor } from './tool-executor.js';
 import type {
-  AgentSession,
+  Agent,
   Message,
   RequiredParam,
   Skill,
@@ -38,14 +39,17 @@ export interface GenerateAgentInput {
 }
 
 export interface GenerateAgentOutput {
-  session: AgentSession;
+  agent: Agent;
+  systemPrompt: string;
   newSkills: Skill[];
   missingParams: RequiredParam[];
 }
 
 const SKILL_RESEARCH_MAX_STEPS = 6;
 
-export async function generateAgentSession(input: GenerateAgentInput): Promise<GenerateAgentOutput> {
+export async function generateAgent(input: GenerateAgentInput): Promise<GenerateAgentOutput> {
+  const config = await loadConfig();
+  const webSearchStatus = getWebSearchStatus(config);
   const client = await createLLMClient(input.provider, input.model);
   const existingSkills = await listSkills();
   const builtInTools = getBuiltinToolDefinitions();
@@ -53,7 +57,22 @@ export async function generateAgentSession(input: GenerateAgentInput): Promise<G
   const skillResearchExecutor = new DefaultToolExecutor(process.cwd(), {
     ...(input.provider ? { provider: input.provider } : {}),
     ...(input.model ? { model: input.model } : {}),
+    webSearch: {
+      enabled: config.webSearch.enabled,
+      ...(config.webSearch.provider ? { provider: config.webSearch.provider } : {}),
+      providers: Object.fromEntries(
+        Object.entries(config.webSearch.providers)
+          .filter(([, value]) => Boolean(value?.apiKey?.trim()))
+          .map(([provider, value]) => [provider, { apiKey: value!.apiKey.trim() }]),
+      ),
+    },
   });
+
+  if (!webSearchStatus.available) {
+    console.log('⚠️  Web search is not configured for generation research.');
+    console.log('   Some generated skills may be less current without live web context.');
+    console.log('   Run "openforge config" to enable web search and add a provider key.\n');
+  }
 
   console.log('\n📊 Step 1/3 — Auditing skills...');
   console.log(`  Analyzing request: "${input.request}"\n`);
@@ -93,7 +112,7 @@ export async function generateAgentSession(input: GenerateAgentInput): Promise<G
     console.log(`\n✓ Step 2/3 — No new skills needed`);
   }
 
-  console.log(`\n📋 Step 3/3 — Assembling agent session...\n`);
+  console.log(`\n📋 Step 3/3 — Assembling agent...\n`);
 
   const allSkills = await listSkills();
   const assignedSkillIds = Array.from(new Set([...audit.useSkillIds, ...created.map((skill) => skill.id)]));
@@ -106,23 +125,23 @@ export async function generateAgentSession(input: GenerateAgentInput): Promise<G
   const missingParams = await findMissingParams(allRequiredParams);
   const systemPrompt = await buildSystemPrompt(input.request, assignedSkills, builtInTools);
 
-  const session: AgentSession = {
+  const agent: Agent = {
     id: randomUUID(),
-    name: await generateSessionName(input.request),
+    name: await generateAgentName(input.request),
     description: input.request,
-    systemPrompt,
     skills: assignedSkillIds,
     provider: input.provider ?? '',
     model: input.model ?? '',
     status: 'ready',
-    messages: [createMessage('system', systemPrompt)],
+    messages: [],
     checkpoints: [],
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   return {
-    session,
+    agent,
+    systemPrompt,
     newSkills: created,
     missingParams,
   };
@@ -346,8 +365,8 @@ async function createSkillPlaybook(
   return { skill, markdown: rawMarkdown };
 }
 
-async function generateSessionName(request: string): Promise<string> {
-  const first = request.trim().split(/[.?!\n]/)[0] ?? 'Agent Session';
+async function generateAgentName(request: string): Promise<string> {
+  const first = request.trim().split(/[.?!\n]/)[0] ?? 'Agent';
   return first.length <= 70 ? first : `${first.slice(0, 67)}...`;
 }
 
@@ -355,7 +374,7 @@ async function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDe
   // CRITICAL INVARIANT: Skills are NEVER callable tools. They are reference material injected
   // into the system prompt for strategy and workflow guidance only. The tools array must contain
   // ONLY built-in tools (read_file, write_file, terminal_command, http_request, web_search).
-  // Skills are loaded from the session's skills array and injected as narrative content.
+  // Skills are loaded from the agent's skills array and injected as narrative content.
   
   const toolLines = tools.map((tool) => {
     const keys = getToolParameterKeys(tool.parameters);

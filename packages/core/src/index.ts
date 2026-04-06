@@ -1,4 +1,5 @@
 export * from './types.js';
+export * from './agent-schedule.js';
 export * from './agent-runtime.js';
 export * from './bootstrap.js';
 export { getBuiltinToolDefinitions, executeBuiltinTool } from './builtin-tools/registry.js';
@@ -12,7 +13,7 @@ export * from './params-store.js';
 export * from './paths.js';
 export * from './provider-catalog.js';
 export * from './skill-markdown.js';
-export * from './session-store.js';
+export * from './agent-store.js';
 export * from './skill-store.js';
 export * from './starter-skills.js';
 export * from './tool-executor.js';

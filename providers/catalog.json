@@ -7,7 +7,9 @@
     "authHeader": "x-api-key",
     "sdk": "native",
     "models": [
+      { "id": "claude-sonnet-4-6", "contextWindow": 200000, "tags": ["reasoning", "coding", "tool-use", "long-context"] },
       { "id": "claude-sonnet-4-5", "contextWindow": 200000, "tags": ["reasoning", "coding", "tool-use", "long-context"] },
+      { "id": "claude-opus-4-6", "contextWindow": 200000, "tags": ["reasoning", "analysis", "tool-use"] },
       { "id": "claude-opus-4-1", "contextWindow": 200000, "tags": ["reasoning", "analysis", "tool-use"] },
       { "id": "claude-haiku-4-5", "contextWindow": 200000, "tags": ["reasoning", "creative", "tool-use"] }
     ]
@@ -20,6 +22,9 @@
     "authHeader": "Authorization",
     "sdk": "openai-compatible",
     "models": [
+      { "id": "gpt-5.4", "contextWindow": 1047576, "tags": ["reasoning", "tool-use", "multimodal"] },
+      { "id": "gpt-5.3-chat", "contextWindow": 1047576, "tags": ["reasoning", "tool-use", "multimodal"] },
+      { "id": "gpt-5.2", "contextWindow": 1047576, "tags": ["reasoning", "tool-use", "multimodal"] },
       { "id": "gpt-4.1", "contextWindow": 1047576, "tags": ["reasoning", "tool-use", "multimodal"] },
       { "id": "gpt-4.1-mini", "contextWindow": 1047576, "tags": ["fast", "tool-use"] }
     ]
@@ -32,6 +37,8 @@
     "authHeader": "x-goog-api-key",
     "sdk": "native",
     "models": [
+      { "id": "gemini-3.1-pro-preview", "contextWindow": 1048576, "tags": ["reasoning", "tool-use", "preview"] },
+      { "id": "gemini-3.1-flash-lite-preview", "contextWindow": 1048576, "tags": ["fast", "tool-use", "preview"] },
       { "id": "gemini-2.5-pro", "contextWindow": 1048576, "tags": ["reasoning", "tool-use", "long-context"] },
       { "id": "gemini-2.5-flash", "contextWindow": 1048576, "tags": ["fast", "tool-use", "multimodal"] }
     ]
@@ -56,8 +63,8 @@
     "authHeader": "Authorization",
     "sdk": "openai-compatible",
     "models": [
-      { "id": "grok-3-latest", "contextWindow": 131072, "tags": ["reasoning", "tool-use"] },
-      { "id": "grok-3-mini-latest", "contextWindow": 131072, "tags": ["fast", "tool-use"] }
+      { "id": "grok-4-1-fast", "contextWindow": 131072, "tags": ["reasoning", "tool-use"] },
+      { "id": "grok-4-1-mini", "contextWindow": 131072, "tags": ["fast", "tool-use"] }
     ]
   },
   {
@@ -68,8 +75,8 @@
     "authHeader": "Authorization",
     "sdk": "openai-compatible",
     "models": [
-      { "id": "llama-3.3-70b-versatile", "contextWindow": 131072, "tags": ["fast", "tool-use"] },
-      { "id": "mixtral-8x7b-32768", "contextWindow": 32768, "tags": ["economy", "tool-use"] }
+      { "id": "openai/gpt-oss-20b", "contextWindow": 131072, "tags": ["reasoning", "tool-use"] },
+      { "id": "openai/gpt-oss-70b", "contextWindow": 131072, "tags": ["high-capacity", "tool-use"] }
     ]
   },
   {
@@ -80,8 +87,8 @@
     "authHeader": "Authorization",
     "sdk": "openai-compatible",
     "models": [
-      { "id": "mistral-large-latest", "contextWindow": 131072, "tags": ["reasoning", "tool-use"] },
-      { "id": "ministral-8b-latest", "contextWindow": 131072, "tags": ["fast", "economy"] }
+      { "id": "mistral-large", "contextWindow": 131072, "tags": ["reasoning", "tool-use"] },
+      { "id": "mistral-instant", "contextWindow": 131072, "tags": ["fast", "economy"] }
     ]
   },
   {
@@ -92,7 +99,11 @@
     "authHeader": "Authorization",
     "sdk": "openai-compatible",
     "models": [
-      { "id": "openai/gpt-4.1", "contextWindow": 1047576, "tags": ["routing", "tool-use"] },
+      { "id": "openai/gpt-5.4", "contextWindow": 1047576, "tags": ["routing", "tool-use", "multimodal"] },
+      { "id": "openai/gpt-5.3-chat", "contextWindow": 1047576, "tags": ["routing", "tool-use", "multimodal"] },
+      { "id": "openai/gpt-5.2", "contextWindow": 1047576, "tags": ["routing", "tool-use", "multimodal"] },
+      { "id": "openai/gpt-4.1", "contextWindow": 1047576, "tags": ["routing", "tool-use", "multimodal"] },
+      { "id": "openai/gpt-4.1-mini", "contextWindow": 1047576, "tags": ["routing", "fast", "tool-use"] },
       { "id": "anthropic/claude-sonnet-4-5", "contextWindow": 200000, "tags": ["routing", "reasoning", "tool-use"] }
     ]
   }

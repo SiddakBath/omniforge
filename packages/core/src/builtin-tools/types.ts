@@ -6,6 +6,11 @@ export interface BuiltinToolContext {
   model?: string;
   apiKey?: string;
   baseUrl?: string;
+  webSearch?: {
+    enabled: boolean;
+    provider?: string;
+    providers: Record<string, { apiKey: string }>;
+  };
 }
 
 export type BuiltinToolExecutor = (
