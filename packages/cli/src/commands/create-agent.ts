@@ -16,7 +16,7 @@ import {
   saveAgent,
   saveAgentSystemPrompt,
   saveParamValue,
-} from '@openforge/core';
+} from '../core/index.js';
 import { input, password, select } from '@inquirer/prompts';
 import { promptConfirm } from '../utils/interactive.js';
 import { displayBanner } from '../utils/banner.js';
@@ -43,7 +43,7 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
     console.log('⚠️  Web search is currently unavailable.');
     console.log('   This will limit the quality of skill creation and agent generation.');
     console.log('   Skills won\'t be able to research topics, and agents will lack web research capabilities.');
-    console.log('   Run "openforge config" to enable web search and save a key.\n');
+    console.log('   Run "omniforge config" to enable web search and save a key.\n');
   }
   const catalog = await loadProviderCatalog();
 
@@ -179,7 +179,7 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
       .join(', ');
     throw new Error(
       `Cannot start agent: required parameters are missing or invalid. ${missing}. ` +
-      `Parameters are stored in ~/.openforge/params.json. Run "openforge reset" to clear and re-enter parameters.`
+      `Parameters are stored in ~/.omniforge/params.json. Run "omniforge reset" to clear and re-enter parameters.`
     );
   }
 

@@ -100,7 +100,7 @@ function truncateHistory(history: Message[]): Message[] {
 }
 
 function resolveMaxContextMessages(): number {
-  const parsed = Number(process.env.OPENFORGE_MAX_CONTEXT_MESSAGES ?? DEFAULT_MAX_CONTEXT_MESSAGES);
+  const parsed = Number(process.env.OMNIFORGE_MAX_CONTEXT_MESSAGES ?? DEFAULT_MAX_CONTEXT_MESSAGES);
   if (!Number.isFinite(parsed) || parsed < 1) {
     return DEFAULT_MAX_CONTEXT_MESSAGES;
   }

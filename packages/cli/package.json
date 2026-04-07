@@ -1,13 +1,35 @@
 {
-  "name": "@openforge/cli",
-  "version": "0.1.1",
+  "name": "omniforge",
+  "version": "0.1.0",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "openforge": "dist/index.js"
+    "omniforge": "dist/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/core/agent-runtime.d.ts",
+      "import": "./dist/core/agent-runtime.js"
+    },
+    "./agent": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./config": {
+      "types": "./dist/core/config-store.d.ts",
+      "import": "./dist/core/config-store.js"
+    }
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -22,10 +44,14 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.3.2",
-    "@openforge/core": "0.1.1",
     "commander": "^13.1.0",
     "ink": "^6.8.0",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "@anthropic-ai/sdk": "^0.82.0",
+    "@google/genai": "^1.46.0",
+    "openai": "^6.33.0",
+    "yaml": "^2.8.1",
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "tsx": "^4.19.3"

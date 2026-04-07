@@ -43,7 +43,7 @@ const BUILTIN_CATALOG: ProviderCatalogEntry[] = [
 ];
 
 export async function loadProviderCatalog(): Promise<ProviderCatalogEntry[]> {
-  const customPath = process.env.OPENFORGE_PROVIDER_CATALOG;
+  const customPath = process.env.OMNIFORGE_PROVIDER_CATALOG;
   const rootCandidate = path.resolve(process.cwd(), 'providers', 'catalog.json');
 
   for (const candidate of [customPath, rootCandidate]) {

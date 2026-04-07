@@ -1,7 +1,7 @@
 import { listSkills, saveSkillBundle } from './skill-store.js';
 import { loadStarterSkillBundles } from './starter-skills.js';
 
-export async function bootstrapOpenForge(): Promise<void> {
+export async function bootstrapOmniForge(): Promise<void> {
   const existing = await listSkills();
   const existingIds = new Set(existing.map((skill) => skill.id));
 

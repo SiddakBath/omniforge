@@ -71,7 +71,7 @@ export async function generateAgent(input: GenerateAgentInput): Promise<Generate
   if (!webSearchStatus.available) {
     console.log('⚠️  Web search is not configured for generation research.');
     console.log('   Some generated skills may be less current without live web context.');
-    console.log('   Run "openforge config" to enable web search and add a provider key.\n');
+    console.log('   Run "omniforge config" to enable web search and add a provider key.\n');
   }
 
   console.log('\n📊 Step 1/3 — Auditing skills...');
@@ -405,7 +405,7 @@ async function buildSystemPrompt(request: string, skills: Skill[], tools: ToolDe
   const tailoredPrompt = await generateTailoredPrompt(request, skills, tools);
 
   return [
-    'You are an OpenForge agent.',
+    'You are an OmniForge agent.',
     '',
     tailoredPrompt,
     '',

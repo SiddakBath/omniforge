@@ -33,7 +33,7 @@ export interface RequiredParam {
   required?: boolean; // defaults to true; if false, param is optional
 }
 
-/** Reusable skill playbook persisted to ~/.openforge/skills. */
+/** Reusable skill playbook persisted to ~/.omniforge/skills. */
 export interface Skill {
   id: string;
   name: string;
@@ -108,7 +108,7 @@ export interface WebSearchConfig {
   providers: Partial<Record<WebSearchProvider, { apiKey: string }>>;
 }
 
-export interface OpenForgeConfig {
+export interface OmniForgeConfig {
   generator: {
     provider: string;
     model: string;

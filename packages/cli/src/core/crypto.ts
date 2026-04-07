@@ -4,7 +4,7 @@ import { hostname, userInfo } from 'os';
 const ALGO = 'aes-256-gcm';
 
 function deriveKey(): Buffer {
-  const salt = Buffer.from('openforge-local-salt-v1', 'utf8');
+  const salt = Buffer.from('omniforge-local-salt-v1', 'utf8');
   const identity = `${userInfo().username}@${hostname()}`;
   return scryptSync(identity, salt, 32);
 }

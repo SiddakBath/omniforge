@@ -1,5 +1,5 @@
 import { decryptAtRest, encryptAtRest } from './crypto.js';
-import { ensureOpenForgeDirs, OPENFORGE_PARAMS_FILE, readJsonFile, writeJsonFile } from './paths.js';
+import { ensureOmniForgeDirs, OMNIFORGE_PARAMS_FILE, readJsonFile, writeJsonFile } from './paths.js';
 import type { ParamsStore, RequiredParam } from './types.js';
 
 const EMPTY_PARAMS: ParamsStore = {
@@ -8,8 +8,8 @@ const EMPTY_PARAMS: ParamsStore = {
 };
 
 export async function loadParamsStore(): Promise<ParamsStore> {
-  await ensureOpenForgeDirs();
-  return readJsonFile<ParamsStore>(OPENFORGE_PARAMS_FILE, EMPTY_PARAMS);
+  await ensureOmniForgeDirs();
+  return readJsonFile<ParamsStore>(OMNIFORGE_PARAMS_FILE, EMPTY_PARAMS);
 }
 
 export async function saveParamValue(param: RequiredParam, value: string): Promise<void> {
@@ -19,7 +19,7 @@ export async function saveParamValue(param: RequiredParam, value: string): Promi
   } else {
     store.values[param.key] = value;
   }
-  await writeJsonFile(OPENFORGE_PARAMS_FILE, store);
+  await writeJsonFile(OMNIFORGE_PARAMS_FILE, store);
 }
 
 export async function resolveParamValue(paramKey: string): Promise<string | undefined> {

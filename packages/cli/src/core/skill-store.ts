@@ -2,7 +2,7 @@ import { execFile as execFileCallback } from 'child_process';
 import { mkdir, readdir, readFile, writeFile } from 'fs/promises';
 import { promisify } from 'util';
 import path from 'path';
-import { ensureOpenForgeDirs, OPENFORGE_SKILLS_DIR } from './paths.js';
+import { ensureOmniForgeDirs, OMNIFORGE_SKILLS_DIR } from './paths.js';
 import { parseSkillMarkdown, renderSkillMarkdown } from './skill-markdown.js';
 import type { Skill, SkillBundle } from './types.js';
 
@@ -17,12 +17,12 @@ export interface StoredSkillBundle {
 }
 
 function resolveSkillDir(skillId: string): string {
-  return path.join(OPENFORGE_SKILLS_DIR, skillId);
+  return path.join(OMNIFORGE_SKILLS_DIR, skillId);
 }
 
 async function listSkillDirectories(): Promise<string[]> {
-  const entries = await readdir(OPENFORGE_SKILLS_DIR, { withFileTypes: true });
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => path.join(OPENFORGE_SKILLS_DIR, entry.name));
+  const entries = await readdir(OMNIFORGE_SKILLS_DIR, { withFileTypes: true });
+  return entries.filter((entry) => entry.isDirectory()).map((entry) => path.join(OMNIFORGE_SKILLS_DIR, entry.name));
 }
 
 async function loadStoredBundle(skillDir: string): Promise<StoredSkillBundle | undefined> {
@@ -42,7 +42,7 @@ async function loadStoredBundle(skillDir: string): Promise<StoredSkillBundle | u
 }
 
 export async function listSkills(): Promise<Skill[]> {
-  await ensureOpenForgeDirs();
+  await ensureOmniForgeDirs();
   const directories = await listSkillDirectories();
   const bundles = await Promise.all(directories.map((dir) => loadStoredBundle(dir)));
   const skills = bundles
@@ -53,7 +53,7 @@ export async function listSkills(): Promise<Skill[]> {
 }
 
 export async function listSkillBundles(): Promise<StoredSkillBundle[]> {
-  await ensureOpenForgeDirs();
+  await ensureOmniForgeDirs();
   const directories = await listSkillDirectories();
   const bundles = await Promise.all(directories.map((dir) => loadStoredBundle(dir)));
   return bundles
@@ -62,12 +62,12 @@ export async function listSkillBundles(): Promise<StoredSkillBundle[]> {
 }
 
 export async function getSkillBundle(skillId: string): Promise<StoredSkillBundle | undefined> {
-  await ensureOpenForgeDirs();
+  await ensureOmniForgeDirs();
   return loadStoredBundle(resolveSkillDir(skillId));
 }
 
 export async function saveSkillBundle(bundle: SkillBundle): Promise<Skill> {
-  await ensureOpenForgeDirs();
+  await ensureOmniForgeDirs();
   const skillId = bundle.skill.id.trim();
   if (!skillId) {
     throw new Error('Skill id is required.');

@@ -1,8 +1,8 @@
-# OpenForge architecture
+# OmniForge architecture
 
 ## Core responsibilities
 
-### `packages/core`
+### `packages/cli/src/core`
 
 - **Provider abstraction** via `LLMClient.complete(messages, tools, stream)`
 - **Runtime loop** for tool-use turn execution
@@ -14,7 +14,7 @@
   4. Agent assembly
 - **Storage layer** for config, params, skills, and agents
 
-### `packages/cli`
+### `packages/cli/src`
 
 - Onboarding wizard
 - Agent creation flow
@@ -31,7 +31,7 @@
 6. Agent runtime executes loop with tool calls.
 7. Checkpoint written at end of each completed turn.
 
-## Persistence model (`~/.openforge`)
+## Persistence model (`~/.omniforge`)
 
 - `config.json`
 - `params.json`
@@ -44,19 +44,19 @@
 
 - Runtime sends only the most recent non-system messages (bounded context window).
 - The system prompt is always injected as the first message from `system-prompt.md`.
-- Max message count is configurable via `OPENFORGE_MAX_CONTEXT_MESSAGES` (default `60`).
+- Max message count is configurable via `OMNIFORGE_MAX_CONTEXT_MESSAGES` (default `60`).
 
 ## Scheduling
 
 - Agents can define an optional daily schedule (`HH:mm` + IANA timezone + optional prompt).
-- A long-running CLI scheduler (`openforge scheduler`) polls due agents and executes one turn.
+- A long-running CLI scheduler (`omniforge scheduler`) polls due agents and executes one turn.
 - Schedule metadata is stored in `agents/<agent-id>/agent.json` and updated after each run:
   - `nextRunAt` (UTC)
   - `lastRunAt` (UTC)
 
 ## Design constraints
 
-- Local-first only (`~/.openforge/`)
-- No external OpenForge backend
-- Strict TypeScript interfaces exported from core
+- Local-first only (`~/.omniforge/`)
+- No external OmniForge backend
+- Strict TypeScript interfaces exported from `omniforge/core`
 - Provider/model selection remains user-controlled

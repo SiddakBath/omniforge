@@ -16,7 +16,7 @@ import {
   runAgentTurn,
   saveAgent,
   type Agent,
-} from '@openforge/core';
+} from '../core/index.js';
 import { displayBanner } from '../utils/banner.js';
 
 const CHECK_INTERVAL_MS = 30_000;
@@ -69,7 +69,7 @@ async function runScheduledAgent(agentSnapshot: Agent): Promise<void> {
 
     if (!webSearchStatus.available) {
       console.log('   ℹ️ Web search unavailable; continuing without external web search.');
-      console.log('      Configure with: openforge config');
+      console.log('      Configure with: omniforge config');
     }
 
     const executor = new DefaultToolExecutor(agentDataDir, {

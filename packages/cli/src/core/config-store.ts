@@ -1,7 +1,7 @@
-import { ensureOpenForgeDirs, OPENFORGE_CONFIG_FILE, readJsonFile, writeJsonFile } from './paths.js';
-import type { OpenForgeConfig } from './types.js';
+import { ensureOmniForgeDirs, OMNIFORGE_CONFIG_FILE, readJsonFile, writeJsonFile } from './paths.js';
+import type { OmniForgeConfig } from './types.js';
 
-const DEFAULT_CONFIG: OpenForgeConfig = {
+const DEFAULT_CONFIG: OmniForgeConfig = {
   generator: {
     provider: '',
     model: '',
@@ -14,7 +14,7 @@ const DEFAULT_CONFIG: OpenForgeConfig = {
   },
 };
 
-function normalizeConfig(raw: OpenForgeConfig): OpenForgeConfig {
+function normalizeConfig(raw: OmniForgeConfig): OmniForgeConfig {
   const webSearchRaw = raw.webSearch;
   const provider = typeof webSearchRaw?.provider === 'string' ? webSearchRaw.provider : '';
   const providerEntries = webSearchRaw?.providers ?? {};
@@ -22,7 +22,7 @@ function normalizeConfig(raw: OpenForgeConfig): OpenForgeConfig {
     Object.entries(providerEntries)
       .filter(([, value]) => Boolean(value?.apiKey?.trim()))
       .map(([key, value]) => [key, { apiKey: value!.apiKey.trim() }]),
-  ) as OpenForgeConfig['webSearch']['providers'];
+  ) as OmniForgeConfig['webSearch']['providers'];
 
   return {
     ...raw,
@@ -39,15 +39,15 @@ function normalizeConfig(raw: OpenForgeConfig): OpenForgeConfig {
   };
 }
 
-export async function loadConfig(): Promise<OpenForgeConfig> {
-  await ensureOpenForgeDirs();
-  const loaded = await readJsonFile<OpenForgeConfig>(OPENFORGE_CONFIG_FILE, DEFAULT_CONFIG);
+export async function loadConfig(): Promise<OmniForgeConfig> {
+  await ensureOmniForgeDirs();
+  const loaded = await readJsonFile<OmniForgeConfig>(OMNIFORGE_CONFIG_FILE, DEFAULT_CONFIG);
   return normalizeConfig(loaded);
 }
 
-export async function saveConfig(config: OpenForgeConfig): Promise<void> {
-  await ensureOpenForgeDirs();
-  await writeJsonFile(OPENFORGE_CONFIG_FILE, config);
+export async function saveConfig(config: OmniForgeConfig): Promise<void> {
+  await ensureOmniForgeDirs();
+  await writeJsonFile(OMNIFORGE_CONFIG_FILE, config);
 }
 
 export async function isOnboarded(): Promise<boolean> {
@@ -55,7 +55,7 @@ export async function isOnboarded(): Promise<boolean> {
   return Boolean(config.generator.provider && config.generator.model);
 }
 
-export function getWebSearchStatus(config: OpenForgeConfig): {
+export function getWebSearchStatus(config: OmniForgeConfig): {
   available: boolean;
   provider?: string;
   reason?: string;

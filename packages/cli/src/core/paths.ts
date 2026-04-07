@@ -2,14 +2,14 @@ import { mkdir, readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import path from 'path';
 
-export const OPENFORGE_HOME = path.join(homedir(), '.openforge');
-export const OPENFORGE_SKILLS_DIR = path.join(OPENFORGE_HOME, 'skills');
-export const OPENFORGE_CONFIG_FILE = path.join(OPENFORGE_HOME, 'config.json');
-export const OPENFORGE_PARAMS_FILE = path.join(OPENFORGE_HOME, 'params.json');
-export const OPENFORGE_AGENTS_DIR = path.join(OPENFORGE_HOME, 'agents');
+export const OMNIFORGE_HOME = path.join(homedir(), '.omniforge');
+export const OMNIFORGE_SKILLS_DIR = path.join(OMNIFORGE_HOME, 'skills');
+export const OMNIFORGE_CONFIG_FILE = path.join(OMNIFORGE_HOME, 'config.json');
+export const OMNIFORGE_PARAMS_FILE = path.join(OMNIFORGE_HOME, 'params.json');
+export const OMNIFORGE_AGENTS_DIR = path.join(OMNIFORGE_HOME, 'agents');
 
 export function getAgentDir(agentId: string): string {
-  return path.join(OPENFORGE_AGENTS_DIR, agentId);
+  return path.join(OMNIFORGE_AGENTS_DIR, agentId);
 }
 
 export function getAgentStateFile(agentId: string): string {
@@ -24,11 +24,11 @@ export function getAgentDataDir(agentId: string): string {
   return path.join(getAgentDir(agentId), 'data');
 }
 
-export async function ensureOpenForgeDirs(): Promise<void> {
+export async function ensureOmniForgeDirs(): Promise<void> {
   await Promise.all([
-    mkdir(OPENFORGE_HOME, { recursive: true }),
-    mkdir(OPENFORGE_SKILLS_DIR, { recursive: true }),
-    mkdir(OPENFORGE_AGENTS_DIR, { recursive: true }),
+    mkdir(OMNIFORGE_HOME, { recursive: true }),
+    mkdir(OMNIFORGE_SKILLS_DIR, { recursive: true }),
+    mkdir(OMNIFORGE_AGENTS_DIR, { recursive: true }),
   ]);
 }
 

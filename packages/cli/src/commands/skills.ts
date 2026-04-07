@@ -1,5 +1,5 @@
 import * as readline from 'readline';
-import { bootstrapOpenForge, listSkills } from '@openforge/core';
+import { bootstrapOmniForge, listSkills } from '../core/index.js';
 import { Box, render, Text } from 'ink';
 import React, { useState, useEffect } from 'react';
 import { Header, Section, ListItem } from '../components/index.js';
@@ -115,6 +115,7 @@ function SkillViewer({ skills }: { skills: any[] }) {
 export async function runSkillsCommand(): Promise<void> {
   console.clear?.();
   displayBanner();
+  await bootstrapOmniForge();
   const skills = await listSkills();
 
   if (skills.length === 0) {

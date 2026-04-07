@@ -1,6 +1,6 @@
 import { loadProviderCatalog } from './provider-catalog.js';
 import { loadConfig, saveConfig } from './config-store.js';
-import { bootstrapOpenForge } from './bootstrap.js';
+import { bootstrapOmniForge } from './bootstrap.js';
 import type { WebSearchProvider } from './types.js';
 
 export interface OnboardingInput {
@@ -46,5 +46,5 @@ export async function runOnboarding(input: OnboardingInput): Promise<void> {
 
   await saveConfig(config);
 
-  await bootstrapOpenForge();
+  await bootstrapOmniForge();
 }

@@ -1,4 +1,4 @@
-import { loadConfig, loadProviderCatalog, runOnboarding, type WebSearchProvider } from '@openforge/core';
+import { loadConfig, loadProviderCatalog, runOnboarding, type WebSearchProvider } from '../core/index.js';
 import { confirm, password, select } from '@inquirer/prompts';
 import { displayBanner } from '../utils/banner.js';
 
@@ -46,7 +46,7 @@ const WEB_SEARCH_PROVIDER_CHOICES: Array<{
 
 export async function runOnboardingCommand(): Promise<void> {
   displayBanner();
-  console.log('Welcome to OpenForge onboarding.');
+  console.log('Welcome to OmniForge onboarding.');
   console.log('This will configure provider/model defaults and save API keys locally.\n');
 
   const existingConfig = await loadConfig();
@@ -203,9 +203,9 @@ export async function runOnboardingCommand(): Promise<void> {
     });
 
     console.log('\n✅ Onboarding complete.');
-    console.log('Config saved to ~/.openforge/config.json');
-    console.log('You can re-run configuration any time with: openforge config');
-    console.log('You can now run: openforge create "your request"\n');
+    console.log('Config saved to ~/.omniforge/config.json');
+    console.log('You can re-run configuration any time with: omniforge config');
+    console.log('You can now run: omniforge create "your request"\n');
     return;
   }
 }

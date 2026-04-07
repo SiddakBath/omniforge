@@ -1,14 +1,10 @@
 {
-  "name": "openforge",
-  "version": "0.1.1",
+  "name": "omniforge",
+  "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "description": "Local-first, open-source agentic framework. Build and run AI agents from natural language.",
-  "author": "OpenForge contributors",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/openforge/openforge"
-  },
+  "description": "Local-first, open-source AI automation app for end users.",
+  "author": "OmniForge contributors",
   "keywords": [
     "ai",
     "agents",
@@ -19,16 +15,16 @@
   ],
   "packageManager": "npm@10.8.2",
   "workspaces": [
-    "packages/*"
+    "packages/cli"
   ],
   "scripts": {
     "build": "npm run --workspaces build",
-    "dev": "npm run -w @openforge/cli dev",
-    "dev:cli": "npm run -w @openforge/cli dev",
+    "dev": "npm run -w omniforge dev",
+    "dev:cli": "npm run -w omniforge dev",
     "check": "npm run build && npm run lint && npm run typecheck",
     "lint": "npm run --workspaces lint",
     "release:check": "npm run check && npm audit --omit=dev",
-    "release:pack": "npm pack --dry-run -w @openforge/core && npm pack --dry-run -w @openforge/cli",
+    "release:pack": "npm pack --dry-run -w omniforge",
     "test": "npm run --workspaces --if-present test",
     "typecheck": "npm run --workspaces typecheck"
   },

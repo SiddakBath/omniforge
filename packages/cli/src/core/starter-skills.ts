@@ -35,15 +35,15 @@ async function loadFromDirectory(skillsDir: string): Promise<SkillBundle[]> {
 
 export async function loadStarterSkillBundles(): Promise<SkillBundle[]> {
   // Environment variable takes precedence for custom skill locations
-  if (process.env.OPENFORGE_STARTER_SKILLS_DIR) {
-    const bundles = await loadFromDirectory(process.env.OPENFORGE_STARTER_SKILLS_DIR);
+  if (process.env.OMNIFORGE_STARTER_SKILLS_DIR) {
+    const bundles = await loadFromDirectory(process.env.OMNIFORGE_STARTER_SKILLS_DIR);
     if (bundles.length > 0) {
       return bundles;
     }
   }
 
   // Resolve skills directory relative to this file's location (works regardless of cwd)
-  // __dirname is packages/core/src, skills folder is at the root
+  // __dirname is packages/cli/src/core, skills folder is at the repository root
   const skillsDir = path.resolve(__dirname, '..', '..', '..', 'skills');
   
   return loadFromDirectory(skillsDir);

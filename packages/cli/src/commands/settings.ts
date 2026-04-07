@@ -1,4 +1,4 @@
-import { loadConfig } from '@openforge/core';
+import { loadConfig } from '../core/index.js';
 import { Box, render, Text } from 'ink';
 import React from 'react';
 import { Header, Section } from '../components/index.js';
@@ -8,7 +8,7 @@ function SettingsView({ config }: { config: any }) {
   return React.createElement(
     Box,
     { flexDirection: 'column', paddingX: 2, paddingY: 1 },
-    React.createElement(Header, { title: 'Settings', subtitle: 'Manage your OpenForge configuration' }),
+    React.createElement(Header, { title: 'Settings', subtitle: 'Manage your OmniForge configuration' }),
     React.createElement(
       Section,
       {
@@ -82,14 +82,14 @@ function SettingsView({ config }: { config: any }) {
               Object.keys(config.webSearch?.providers ?? {}).length
             )
           ),
-          React.createElement(Text, { color: 'gray' }, 'Use "openforge config" to update these settings.')
+          React.createElement(Text, { color: 'gray' }, 'Use "omniforge config" to update these settings.')
         ),
       }
     ),
     React.createElement(
       Box,
       { marginTop: 2 },
-      React.createElement(Text, { color: 'gray' }, '💾 Configuration stored at ~/.openforge/config.json')
+      React.createElement(Text, { color: 'gray' }, '💾 Configuration stored at ~/.omniforge/config.json')
     )
   );
 }

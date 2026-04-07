@@ -603,8 +603,8 @@ async function runPerplexitySearch(
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://openforge.local',
-        'X-Title': 'OpenForge Web Search',
+        'HTTP-Referer': 'https://localhost',
+        'X-Title': 'OmniForge Web Search',
       },
       body: JSON.stringify(body),
     },
@@ -671,8 +671,8 @@ async function runPerplexitySearchApi(
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://openforge.local',
-        'X-Title': 'OpenForge Web Search',
+        'HTTP-Referer': 'https://localhost',
+        'X-Title': 'OmniForge Web Search',
       },
       body: JSON.stringify(body),
     },
@@ -953,11 +953,11 @@ function normalizeDomainFilter(raw: unknown): string[] | undefined {
 
 function missingKeyError(provider?: SearchProvider): string {
   if (provider) {
-    return `web_search provider "${provider}" is selected, but no API key was found. Run "openforge config" to enable web search and save a provider key, or set the matching environment variable.`;
+    return `web_search provider "${provider}" is selected, but no API key was found. Run "omniforge config" to enable web search and save a provider key, or set the matching environment variable.`;
   }
   return [
     'No web search provider API key was found.',
-    'Configure web search in OpenForge config by running "openforge config".',
+    'Configure web search in OmniForge config by running "omniforge config".',
     'Or set at least one of: BRAVE_API_KEY, PERPLEXITY_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, XAI_API_KEY, KIMI_API_KEY, MOONSHOT_API_KEY.',
     'If your active model has native web search, ask it to use native search directly instead of the web_search tool.',
   ].join(' ');

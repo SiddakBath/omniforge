@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { bootstrapOpenForge } from '@openforge/core';
+import { bootstrapOmniForge } from './core/index.js';
 import { runCreateAgentCommand } from './commands/create-agent.js';
 import { runOnboardingCommand } from './commands/onboarding.js';
 import { runAgentsCommand } from './commands/agents.js';
@@ -12,12 +12,12 @@ import { runResetCommand } from './commands/reset.js';
 const program = new Command();
 
 program
-  .name('openforge')
-  .description('OpenForge CLI')
+  .name('omniforge')
+  .description('OmniForge CLI')
   .version('0.1.0');
 
 program.hook('preAction', async () => {
-  await bootstrapOpenForge();
+  await bootstrapOmniForge();
 });
 
 program.command('onboard').description('Run first-time provider/model onboarding').action(runOnboardingCommand);
@@ -34,8 +34,8 @@ program
 program.command('agents').description('List resumable agents').action(runAgentsCommand);
 program.command('scheduler').alias('schedule').description('Run scheduled agents continuously').action(runSchedulerCommand);
 program.command('skills').description('Show skill library').action(runSkillsCommand);
-program.command('settings').description('View current OpenForge settings').action(runSettingsCommand);
-program.command('reset').description('Reset OpenForge state (config, agents, skills)').action(runResetCommand);
+program.command('settings').description('View current OmniForge settings').action(runSettingsCommand);
+program.command('reset').description('Reset OmniForge state (config, agents, skills)').action(runResetCommand);
 
 program.parseAsync(process.argv).catch((error) => {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

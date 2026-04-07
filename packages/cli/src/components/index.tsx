@@ -1,5 +1,5 @@
 /**
- * Shared TUI components for OpenForge CLI
+ * Shared TUI components for OmniForge CLI
  */
 import React from 'react';
 import { Box, Text } from 'ink';

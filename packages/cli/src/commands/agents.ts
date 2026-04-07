@@ -18,7 +18,7 @@ import {
   saveAgent,
   saveParamValue,
   ensureAgentDataDir,
-} from '@openforge/core';
+} from '../core/index.js';
 import { selectFromList, promptInput, promptPassword, promptConfirm, printInfo, printSuccess } from '../utils/interactive.js';
 import { displayBanner } from '../utils/banner.js';
 
@@ -73,7 +73,7 @@ async function ensureAgentDependencies(agent: Agent): Promise<void> {
       .join(', ');
     throw new Error(
       `Cannot run agent: required parameters are missing or invalid. ${missing}. ` +
-        `Parameters are stored in ~/.openforge/params.json. Run "openforge reset" to clear and re-enter parameters.`
+        `Parameters are stored in ~/.omniforge/params.json. Run "omniforge reset" to clear and re-enter parameters.`
     );
   }
 
@@ -93,7 +93,7 @@ export async function runInteractiveAgent(
 
   if (!webSearchStatus.available) {
     console.log('ℹ️  Web search is unavailable for this run.');
-    console.log('   Run "openforge config" to enable web search and save a provider key.\n');
+    console.log('   Run "omniforge config" to enable web search and save a provider key.\n');
   }
 
   // Use agent-specific data directory for file operations.
@@ -167,7 +167,7 @@ export async function runInteractiveAgent(
     process.stdout.write('\n');
   }
 
-  console.log('\n👋 Agent paused. Run "openforge agents" to continue later.\n');
+  console.log('\n👋 Agent paused. Run "omniforge agents" to continue later.\n');
   return agent;
 }
 
@@ -248,7 +248,7 @@ async function runSingleAgentTurnNow(agent: Agent): Promise<Agent> {
 
   if (!webSearchStatus.available) {
     console.log('ℹ️  Web search is unavailable for this run.');
-    console.log('   Run "openforge config" to enable web search and save a provider key.\n');
+    console.log('   Run "omniforge config" to enable web search and save a provider key.\n');
   }
   const agentDataDir = await ensureAgentDataDir(agent.id);
 
@@ -290,7 +290,7 @@ export async function runAgentsCommand(): Promise<void> {
 
     const agents = await listAgents();
     if (agents.length === 0) {
-      console.log('\nNo agents found. Create one with: openforge create\n');
+      console.log('\nNo agents found. Create one with: omniforge create\n');
       return;
     }
 
