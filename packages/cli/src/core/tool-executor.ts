@@ -3,6 +3,7 @@ import { resolveParamValue } from './params-store.js';
 import type { ToolCall, ToolExecutionResult, ToolExecutor } from './types.js';
 
 interface ExecutorContext {
+  currentAgentId?: string | undefined;
   provider?: string | undefined;
   model?: string | undefined;
   apiKey?: string | undefined;
@@ -23,6 +24,7 @@ export class DefaultToolExecutor implements ToolExecutor {
   async execute(call: ToolCall): Promise<ToolExecutionResult> {
     const builtinContext = {
       workspaceRoot: this.workspaceRoot,
+      ...(this._context.currentAgentId ? { currentAgentId: this._context.currentAgentId } : {}),
       ...(this._context.provider ? { provider: this._context.provider } : {}),
       ...(this._context.model ? { model: this._context.model } : {}),
       ...(this._context.apiKey ? { apiKey: this._context.apiKey } : {}),

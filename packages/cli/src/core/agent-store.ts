@@ -12,16 +12,32 @@ import type { Agent, Checkpoint } from './types.js';
 
 export async function saveAgent(agent: Agent): Promise<void> {
   await ensureOmniForgeDirs();
-  await mkdir(getAgentDir(agent.id), { recursive: true });
-  const target = getAgentStateFile(agent.id);
+  await mkdir(getAgentDir(agent.name), { recursive: true });
+  const target = getAgentStateFile(agent.name);
   await writeFile(target, `${JSON.stringify(agent, null, 2)}\n`, 'utf8');
 }
 
 export async function loadAgent(agentId: string): Promise<Agent | undefined> {
   await ensureOmniForgeDirs();
   try {
-    const raw = await readFile(getAgentStateFile(agentId), 'utf8');
-    return JSON.parse(raw) as Agent;
+    // Search all agent directories to find the agent by ID
+    const agentEntries = await readdir(OMNIFORGE_AGENTS_DIR, { withFileTypes: true });
+    for (const entry of agentEntries) {
+      if (!entry.isDirectory()) {
+        continue;
+      }
+      try {
+        const stateFile = path.join(OMNIFORGE_AGENTS_DIR, entry.name, 'agent.json');
+        const raw = await readFile(stateFile, 'utf8');
+        const agent = JSON.parse(raw) as Agent;
+        if (agent.id === agentId) {
+          return agent;
+        }
+      } catch {
+        // Continue to next directory
+      }
+    }
+    return undefined;
   } catch {
     return undefined;
   }
@@ -48,15 +64,15 @@ export async function listAgents(): Promise<Agent[]> {
   return agents.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }
 
-export async function saveAgentSystemPrompt(agentId: string, systemPrompt: string): Promise<void> {
+export async function saveAgentSystemPrompt(agentName: string, systemPrompt: string): Promise<void> {
   await ensureOmniForgeDirs();
-  await mkdir(getAgentDir(agentId), { recursive: true });
-  await writeFile(getAgentSystemPromptFile(agentId), systemPrompt, 'utf8');
+  await mkdir(getAgentDir(agentName), { recursive: true });
+  await writeFile(getAgentSystemPromptFile(agentName), systemPrompt, 'utf8');
 }
 
-export async function loadAgentSystemPrompt(agentId: string): Promise<string> {
+export async function loadAgentSystemPrompt(agentName: string): Promise<string> {
   await ensureOmniForgeDirs();
-  return readFile(getAgentSystemPromptFile(agentId), 'utf8');
+  return readFile(getAgentSystemPromptFile(agentName), 'utf8');
 }
 
 export function checkpointAgent(agent: Agent): Agent {

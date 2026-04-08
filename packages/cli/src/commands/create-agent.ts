@@ -21,6 +21,8 @@ import { input, password, select } from '@inquirer/prompts';
 import { promptConfirm } from '../utils/interactive.js';
 import { displayBanner } from '../utils/banner.js';
 import { configureAgentScheduleInteractive, runInteractiveAgent } from './agents.js';
+import { ensureOllamaReadyInteractive, pullAnotherOllamaModelInteractive } from './ollama-setup.js';
+import type { ProviderCatalogEntry } from '../core/index.js';
 
 export async function runCreateAgentCommand(initialRequest: string): Promise<void> {
   displayBanner();
@@ -45,25 +47,43 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
     console.log('   Skills won\'t be able to research topics, and agents will lack web research capabilities.');
     console.log('   Run "omniforge config" to enable web search and save a key.\n');
   }
-  const catalog = await loadProviderCatalog();
+  const selectProviderStep = async (): Promise<string> => {
+    const catalog = await loadProviderCatalog();
+    return select({
+      message: 'Step 2/6 — Choose your runtime provider',
+      choices: catalog.map((entry: { name: string; id: string; models: any[] }) => ({
+        name: `${entry.name} (${entry.models.length} models)`,
+        value: entry.id,
+        description: `Provider ID: ${entry.id}`,
+      })),
+      pageSize: 10,
+    });
+  };
 
-  let provider = await select({
-    message: 'Step 2/6 — Choose your runtime provider',
-    choices: catalog.map((entry: { name: string; id: string; models: any[] }) => ({
-      name: `${entry.name} (${entry.models.length} models)`,
-      value: entry.id,
-      description: `Provider ID: ${entry.id}`,
-    })),
-    pageSize: 10,
-  });
+  const resolveProvider = async (providerId: string): Promise<ProviderCatalogEntry> => {
+    const entry = await getProviderById(providerId);
+    if (!entry) {
+      throw new Error(`Unknown provider ${providerId}`);
+    }
+    return entry;
+  };
 
-  let providerEntry = await getProviderById(provider);
-  if (!providerEntry) {
-    throw new Error(`Unknown provider ${provider}`);
-  }
+  let provider = await selectProviderStep();
+  let providerEntry = await resolveProvider(provider);
 
   let model = '';
   while (true) {
+    if (providerEntry.id === 'ollama') {
+      const ensured = await ensureOllamaReadyInteractive(providerEntry);
+      if (ensured.goBack) {
+        provider = await selectProviderStep();
+        providerEntry = await resolveProvider(provider);
+        continue;
+      }
+
+      providerEntry = ensured.provider;
+    }
+
     const selectedModel = await select({
       message: `Step 3/6 — Choose runtime model (${providerEntry.name})`,
       choices: [
@@ -72,6 +92,15 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
           value: entry.id,
           description: `${entry.contextWindow.toLocaleString()} context • ${entry.tags.join(', ')}`,
         })),
+        ...(providerEntry.id === 'ollama'
+          ? [
+              {
+                name: '➕ Download another Ollama model',
+                value: '__pull_model__',
+                description: 'Run `ollama pull <model>` and refresh this list',
+              },
+            ]
+          : []),
         {
           name: '← Back to provider selection',
           value: '__back__',
@@ -82,20 +111,14 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
     });
 
     if (selectedModel === '__back__') {
-      provider = await select({
-        message: 'Step 2/6 — Choose your runtime provider',
-        choices: catalog.map((entry: { name: string; id: string; models: any[] }) => ({
-          name: `${entry.name} (${entry.models.length} models)`,
-          value: entry.id,
-          description: `Provider ID: ${entry.id}`,
-        })),
-        pageSize: 10,
-      });
+      provider = await selectProviderStep();
+      providerEntry = await resolveProvider(provider);
+      continue;
+    }
 
-      providerEntry = await getProviderById(provider);
-      if (!providerEntry) {
-        throw new Error(`Unknown provider ${provider}`);
-      }
+    if (selectedModel === '__pull_model__') {
+      await pullAnotherOllamaModelInteractive();
+      providerEntry = await resolveProvider(provider);
       continue;
     }
 
@@ -190,14 +213,14 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
 
   console.log('✅ All skill parameters configured successfully.\n');
 
-  await saveAgentSystemPrompt(output.agent.id, output.systemPrompt);
+  await saveAgentSystemPrompt(output.agent.name, output.systemPrompt);
   await saveAgent(output.agent);
 
   console.log('Step 5/7 — Configure optional daily schedule.\n');
   let createdAgent = await configureAgentScheduleInteractive(output.agent);
 
   const providerConfig = config.providers[provider];
-  const apiKeyNeeded = !providerConfig?.apiKey;
+  const apiKeyNeeded = (providerEntry.requiresApiKey !== false) && !providerConfig?.apiKey;
   if (apiKeyNeeded) {
     const apiKey = await password({
       message: `Step 6/7 — Enter ${providerEntry.name} API key`,
@@ -214,9 +237,10 @@ export async function runCreateAgentCommand(initialRequest: string): Promise<voi
   const client = await createLLMClient(provider, model);
   
   // Ensure agent data directory exists for agent to write files to
-  const agentDataDir = await ensureAgentDataDir(createdAgent.id);
+  const agentDataDir = await ensureAgentDataDir(createdAgent.name);
   
   const executor = new DefaultToolExecutor(agentDataDir, {
+    currentAgentId: createdAgent.id,
     provider,
     model,
     apiKey: config.providers[provider]?.apiKey,

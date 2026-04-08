@@ -6,7 +6,7 @@ import type { WebSearchProvider } from './types.js';
 export interface OnboardingInput {
   provider: string;
   model: string;
-  apiKey: string;
+  apiKey?: string;
   webSearch?: {
     enabled: boolean;
     provider?: WebSearchProvider;
@@ -23,14 +23,18 @@ export async function runOnboarding(input: OnboardingInput): Promise<void> {
   }
 
   const model = provider.models.find((item) => item.id === input.model);
-  if (!model) {
+  const isOllamaWithUnavailableModelList = provider.id === 'ollama' && provider.models.length === 0;
+  if (!model && !isOllamaWithUnavailableModelList) {
     throw new Error(`Model not found for provider ${provider.name}: ${input.model}`);
   }
 
   const config = await loadConfig();
   config.generator.provider = input.provider;
   config.generator.model = input.model;
-  config.providers[input.provider] = { apiKey: input.apiKey };
+  const trimmedKey = input.apiKey?.trim();
+  if (trimmedKey) {
+    config.providers[input.provider] = { apiKey: trimmedKey };
+  }
 
   if (input.webSearch) {
     config.webSearch.enabled = input.webSearch.enabled;

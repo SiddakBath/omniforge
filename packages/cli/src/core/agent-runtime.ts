@@ -23,7 +23,7 @@ export async function runAgentTurn(options: RunTurnOptions): Promise<Agent> {
     status: 'running',
     messages: truncateHistory(options.agent.messages),
   };
-  const systemPrompt = await loadAgentSystemPrompt(agent.id);
+  const systemPrompt = await loadAgentSystemPrompt(agent.name);
 
   if (options.userInput) {
     agent.messages = pushAndTruncate(agent.messages, createMessage('user', options.userInput));

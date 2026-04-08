@@ -49,7 +49,13 @@
 ## Scheduling
 
 - Agents can define an optional daily schedule (`HH:mm` + IANA timezone + optional prompt).
-- A long-running CLI scheduler (`omniforge scheduler`) polls due agents and executes one turn.
+- A long-running CLI scheduler (`omniforge scheduler`) registers per-agent daily jobs and executes one turn when due.
+- Scheduler jobs are reloaded periodically so schedule edits are picked up without restart, and due jobs are caught up on startup.
+- End users can enable automatic startup with `omniforge scheduler-service install`:
+  - Windows: Task Scheduler task (with Startup-folder fallback for restricted environments)
+  - macOS: LaunchAgent (`~/Library/LaunchAgents`)
+  - Linux: systemd user service (`~/.config/systemd/user`)
+- Automatic startup is provisioned automatically when a user creates their first daily schedule.
 - Schedule metadata is stored in `agents/<agent-id>/agent.json` and updated after each run:
   - `nextRunAt` (UTC)
   - `lastRunAt` (UTC)

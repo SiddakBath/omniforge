@@ -2,6 +2,7 @@ import type { ToolCall, ToolDefinition, ToolExecutionResult } from '../types.js'
 
 export interface BuiltinToolContext {
   workspaceRoot: string;
+  currentAgentId?: string;
   provider?: string;
   model?: string;
   apiKey?: string;

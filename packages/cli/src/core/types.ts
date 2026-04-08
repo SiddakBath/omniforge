@@ -94,8 +94,9 @@ export interface ProviderCatalogEntry {
   id: string;
   name: string;
   baseUrl: string;
-  apiKeyEnv: string;
+  apiKeyEnv?: string;
   authHeader: string;
+  requiresApiKey?: boolean; // defaults to true if not specified
   sdk: 'native' | 'openai-compatible';
   models: ProviderModel[];
 }

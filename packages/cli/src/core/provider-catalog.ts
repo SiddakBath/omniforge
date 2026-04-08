@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
 import type { ProviderCatalogEntry } from './types.js';
+import { hydrateOllamaProvider } from './ollama-provider.js';
 
 const BUILTIN_CATALOG: ProviderCatalogEntry[] = [
   {
@@ -40,7 +41,24 @@ const BUILTIN_CATALOG: ProviderCatalogEntry[] = [
       { id: 'gemini-2.5-flash', contextWindow: 1048576, tags: ['fast', 'tool-use', 'multimodal'] },
     ],
   },
+  {
+    id: 'ollama',
+    name: 'Ollama (Local)',
+    baseUrl: 'http://127.0.0.1:11434/v1',
+    authHeader: 'Authorization',
+    requiresApiKey: false,
+    sdk: 'openai-compatible',
+    models: [],
+  },
 ];
+
+/**
+ * Hydrate dynamic provider models (e.g., from external APIs).
+ * Currently supports Ollama provider model discovery.
+ */
+async function hydrateDynamicProviderModels(catalog: ProviderCatalogEntry[]): Promise<ProviderCatalogEntry[]> {
+  return Promise.all(catalog.map((provider) => hydrateOllamaProvider(provider)));
+}
 
 export async function loadProviderCatalog(): Promise<ProviderCatalogEntry[]> {
   const customPath = process.env.OMNIFORGE_PROVIDER_CATALOG;
@@ -54,14 +72,14 @@ export async function loadProviderCatalog(): Promise<ProviderCatalogEntry[]> {
       const raw = await readFile(candidate, 'utf8');
       const parsed = JSON.parse(raw) as ProviderCatalogEntry[];
       if (parsed.length > 0) {
-        return parsed;
+        return hydrateDynamicProviderModels(parsed);
       }
     } catch {
       // fallback
     }
   }
 
-  return BUILTIN_CATALOG;
+  return hydrateDynamicProviderModels(BUILTIN_CATALOG);
 }
 
 export async function getProviderById(providerId: string): Promise<ProviderCatalogEntry | undefined> {

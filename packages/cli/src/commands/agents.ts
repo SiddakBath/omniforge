@@ -11,6 +11,8 @@ import {
   listSkills,
   loadConfig,
   loadAgent,
+  getSchedulerServiceStatus,
+  installSchedulerService,
   runAgentTurn,
   findMissingParams,
   getWebSearchStatus,
@@ -97,9 +99,10 @@ export async function runInteractiveAgent(
   }
 
   // Use agent-specific data directory for file operations.
-  const agentDataDir = await ensureAgentDataDir(initialAgent.id);
+  const agentDataDir = await ensureAgentDataDir(initialAgent.name);
 
   const executor = new DefaultToolExecutor(agentDataDir, {
+    currentAgentId: initialAgent.id,
     provider: initialAgent.provider,
     model: initialAgent.model,
     apiKey: config.providers[initialAgent.provider]?.apiKey,
@@ -232,6 +235,22 @@ export async function configureAgentScheduleInteractive(agent: Agent): Promise<A
   printSuccess(
     `Schedule saved: daily ${updated.schedule?.dailyTime} (${updated.schedule?.timezone}) • next run: ${updated.schedule?.nextRunAt}`,
   );
+
+  try {
+    const schedulerService = await getSchedulerServiceStatus();
+    if (!schedulerService.installed) {
+      await installSchedulerService();
+      printSuccess('Automatic scheduler startup enabled. Scheduled runs will continue after login.');
+    } else {
+      printInfo('Automatic scheduler startup is already configured on this device.');
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    printInfo('Automatic scheduler startup setup was skipped.');
+    printInfo(`Reason: ${message}`);
+    printInfo('You can configure it later with: omniforge scheduler-service install');
+  }
+
   return updated;
 }
 
@@ -250,9 +269,10 @@ async function runSingleAgentTurnNow(agent: Agent): Promise<Agent> {
     console.log('ℹ️  Web search is unavailable for this run.');
     console.log('   Run "omniforge config" to enable web search and save a provider key.\n');
   }
-  const agentDataDir = await ensureAgentDataDir(agent.id);
+  const agentDataDir = await ensureAgentDataDir(agent.name);
 
   const executor = new DefaultToolExecutor(agentDataDir, {
+    currentAgentId: agent.id,
     provider: agent.provider,
     model: agent.model,
     apiKey: config.providers[agent.provider]?.apiKey,

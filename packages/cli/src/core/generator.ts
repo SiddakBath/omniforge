@@ -91,19 +91,17 @@ export async function generateAgent(input: GenerateAgentInput): Promise<Generate
   const created: Skill[] = [];
   if (audit.createSkills.length > 0) {
     console.log(`\n🔨 Step 2/3 — Creating ${audit.createSkills.length} skill(s)...`);
-    for (let i = 0; i < audit.createSkills.length; i++) {
-      const needed = audit.createSkills[i]!;
-      console.log(`  [${i + 1}/${audit.createSkills.length}] Generating "${needed.name}"...`);
-      const bundle = await createSkillPlaybook(
-        client,
-        input.request,
-        needed.name,
-        needed.description,
-        existingSkills,
-        skillResearchTools,
-        skillResearchExecutor,
-      );
-      console.log('        ✓ Generated markdown playbook');
+    const bundles = await createSkillPlaybookBatch(
+      client,
+      input.request,
+      audit.createSkills,
+      existingSkills,
+      skillResearchTools,
+      skillResearchExecutor,
+    );
+    for (let i = 0; i < bundles.length; i++) {
+      const bundle = bundles[i]!;
+      console.log(`  [${i + 1}/${bundles.length}] Generated "${bundle.skill.name}"`);
       const saved = await saveSkillBundle(bundle);
       created.push(saved);
       console.log(`        ✓ Saved to disk`);
@@ -221,92 +219,111 @@ async function runSkillAudit(client: Awaited<ReturnType<typeof createLLMClient>>
   return result.data;
 }
 
-async function createSkillPlaybook(
+async function createSkillPlaybookBatch(
   client: Awaited<ReturnType<typeof createLLMClient>>,
   request: string,
-  skillName: string,
-  description: string,
+  skillsToCreate: Array<{ name: string; description: string }>,
   existingSkills: Skill[],
   researchTools: ToolDefinition[],
   toolExecutor: ToolExecutor,
-): Promise<SkillBundle> {
-  console.log('      • Calling LLM to generate markdown skill...');
+): Promise<SkillBundle[]> {
+  console.log('      • Calling LLM to generate markdown skills in batch...');
+
+  const skillsListForPrompt = skillsToCreate
+    .map((skill, idx) => `${idx + 1}. ${skill.name}: ${skill.description}`)
+    .join('\n');
 
   const messages: Message[] = [
     createMessage(
       'system',
       [
-          '# Skill Generator',
-          '',
-          'Generate a powerful, reusable skill for autonomous agents.',
-          'Skills encode domain expertise and integration workflows. They are NOT generic advice.',
-          '',
-          'Research guidance (conditional, not mandatory):',
-          '- Use web_search ONLY if this skill requires integration with external tools/APIs AND no existing skill already covers these capabilities.',
-          '- Example: If creating a "GitHub PR Manager" skill, search for current GitHub API endpoints and authentication methods.',
-          '- Example: If creating a workflow that reuses existing skill capabilities, web_search may not be necessary.',
-          '- When researching: Find recent, practical information about tool/API surfaces, CLI tools, and integration patterns.',
-          '- You may run multiple web_search calls within the generation loop to gather information incrementally.',
-          '',
-          'Design principles:',
-          '- **Service-integrated**: Connect to external platforms (Gmail, GitHub, Slack, Google Drive).',
-          '- **Multi-step workflows**: Break complex tasks into clear phases with decision gates.',
-          '- **Risk-aware**: Identify approval points, validation steps, and error recovery.',
-          '- **Tool-integrated**: Reference built-in tools (web_search, http_request, terminal_command, read_file) for research, API calls, and data handling.',
-          '- **Reusable**: Design for multiple use cases within the domain, not one-off tasks.',
-          '',
-          'Structure your skill:',
-          '1. **Objectives** - What the workflow achieves and constraints.',
-          '2. **API/Integration details** - Services, endpoints, authentication patterns, rate limits.',
-          '3. **Workflow phases** - Numbered steps with decision logic and error handling.',
-          '4. **Validation/Guardrails** - Critical checks and approval points before irreversible actions.',
-          '',
-          'Examples of STRONG skills:',
-          '- "Google Workspace": Read/compose/reply to Gmail, schedule Calendar events, manage Drive files, query Sheets data.',
-          '- "GitHub": Check PR status, view CI logs, create/comment on issues, query branches, trigger workflows.',
-          '- "Slack": Send messages, manage channels, search message history, post rich content.',
-          '',
-          'Examples of WEAK skills (avoid):',
-          '- "Ask user for details" (belongs in agent behavior)',
-          '- "Write clearly" (too generic)',
-          '- "Read and summarize" (simple tool use, no integration logic)',
-          '',
-          'Existing skills are included in the user message as `existingSkills`. Use that list as a reference to avoid generating a duplicate or overlapping skill.',
-          '- If any existing skill already defines an equivalent required parameter, reuse that same parameter key in this skill as well (do not create duplicate credentials).',
-          '',
-          'Required and Optional Parameters (credentials/API keys):',
-          '- Required parameters: declare in metadata.requires.params as UPPERCASE_SNAKE_CASE.',
-          '- Optional parameters: declare in metadata.requires.optional as UPPERCASE_SNAKE_CASE.',
-          '- Examples:',
-          '  metadata.requires.params: [GITHUB_TOKEN, GMAIL_API_KEY]  # Must be provided',
-          '  metadata.requires.optional: [GOOGLE_WORKSPACE_ADMIN_EMAIL, DEFAULT_CALENDAR_ID]  # Optional with sensible defaults',
-          '- Use optional for parameters that have defaults or aren\'t always needed.',
-          '- In markdown body, reference as ${PARAM_NAME}, NOT actual values.',
-          '- Runtime resolves credentials securely before execution.',
-          '',
-          'Format requirements:',
-          '- Return ONLY markdown, no commentary. Do not wrap in markdown fences (no ```).',
-          '- First non-whitespace content MUST be YAML frontmatter delimited by exactly three hyphens (---).',
-          '- End frontmatter with exactly three hyphens (---) and then body content.',
-          '- Frontmatter MUST include: name, description. Optional: homepage, metadata.',
-          '- Example (must follow this exact structure):',
-          '  ---',
-          '  name: <Skill Name>',
-          '  description: <Concise skill description>',
-          '  metadata (optional):',
-          '    requires:',
-          '      env: [EXAMPLE_PARAM]',
-          '  ---',
-          '  1. …',
-          '- Body: practical workflow guide with clear phases and decision logic.',
-        ].join('\n'),
-      ),
+        '# Batch Skill Generator',
+        '',
+        'Generate multiple reusable skills for autonomous agents in a single batch.',
+        'This ensures consistency across skills, especially for shared parameters and integrations.',
+        'Skills encode domain expertise and integration workflows. They are NOT generic advice.',
+        '',
+        'CRITICAL: Coordinate Parameter Naming',
+        'When multiple skills need the same external service credentials or parameters:',
+        '- Use IDENTICAL parameter names across all skills in this batch.',
+        '- Example: If both skills integrate with Alpaca API, BOTH should use ALPACA_API_KEY and ALPACA_SECRET_KEY.',
+        '- Do NOT create variations like ALPACA_API_SECRET, ALPACA_KEY, etc. Use consistent naming.',
+        '- This prevents duplicate credential requirements and reduces user confusion.',
+        '',
+        'Research guidance (conditional, not mandatory):',
+        '- Use web_search ONLY if skills require integration with external tools/APIs AND no existing skill already covers these capabilities.',
+        '- Example: If creating a "GitHub PR Manager" skill, search for current GitHub API endpoints and authentication methods.',
+        '- Example: If creating a workflow that reuses existing skill capabilities, web_search may not be necessary.',
+        '- When researching: Find recent, practical information about tool/API surfaces, CLI tools, and integration patterns.',
+        '- You may run multiple web_search calls within the generation loop to gather information incrementally.',
+        '',
+        'Design principles:',
+        '- **Service-integrated**: Connect to external platforms (Gmail, GitHub, Slack, Google Drive, etc.).',
+        '- **Multi-step workflows**: Break complex tasks into clear phases with decision gates.',
+        '- **Risk-aware**: Identify approval points, validation steps, and error recovery.',
+        '- **Tool-integrated**: Reference built-in tools (web_search, http_request, terminal_command, read_file) for research, API calls, and data handling.',
+        '- **Reusable**: Design for multiple use cases within the domain, not one-off tasks.',
+        '',
+        'Structure each skill:',
+        '1. **Objectives** - What the workflow achieves and constraints.',
+        '2. **API/Integration details** - Services, endpoints, authentication patterns, rate limits.',
+        '3. **Workflow phases** - Numbered steps with decision logic and error handling.',
+        '4. **Validation/Guardrails** - Critical checks and approval points before irreversible actions.',
+        '',
+        'Examples of STRONG skills:',
+        '- "Google Workspace": Read/compose/reply to Gmail, schedule Calendar events, manage Drive files, query Sheets data.',
+        '- "GitHub": Check PR status, view CI logs, create/comment on issues, query branches, trigger workflows.',
+        '- "Slack": Send messages, manage channels, search message history, post rich content.',
+        '',
+        'Examples of WEAK skills (avoid):',
+        '- "Ask user for details" (belongs in agent behavior)',
+        '- "Write clearly" (too generic)',
+        '- "Read and summarize" (simple tool use, no integration logic)',
+        '',
+        'Existing skills are included in the user message as `existingSkills`. Use that list as a reference to avoid generating duplicates or overlapping skills.',
+        '- If any existing skill already defines an equivalent required parameter, reuse that same parameter key in this batch as well (do not create duplicate credentials).',
+        '',
+        'Required and Optional Parameters (credentials/API keys):',
+        '- Required parameters: declare in metadata.requires.params as UPPERCASE_SNAKE_CASE.',
+        '- Optional parameters: declare in metadata.requires.optional as UPPERCASE_SNAKE_CASE.',
+        '- Examples:',
+        '  metadata.requires.params: [GITHUB_TOKEN, GMAIL_API_KEY]  # Must be provided',
+        '  metadata.requires.optional: [GOOGLE_WORKSPACE_ADMIN_EMAIL, DEFAULT_CALENDAR_ID]  # Optional with sensible defaults',
+        '- Use optional for parameters that have defaults or aren\'t always needed.',
+        '- In markdown body, reference as ${PARAM_NAME}, NOT actual values.',
+        '- Runtime resolves credentials securely before execution.',
+        '',
+        'Output format (CRITICAL for parsing):',
+        '- Generate ALL skills in a single response.',
+        '- Separate each skill with exactly this delimiter on its own line: ===SKILL_SEPARATOR===',
+        '- Each skill must be valid markdown with YAML frontmatter.',
+        '- First skill starts immediately (no delimiter before it).',
+        '- Last skill ends the response (no delimiter after it).',
+        '- Example structure:',
+        '  ---',
+        '  name: Skill 1',
+        '  description: ...',
+        '  metadata:',
+        '    requires:',
+        '      params: [SHARED_PARAM]',
+        '  ---',
+        '  [Skill 1 content]',
+        '  ===SKILL_SEPARATOR===',
+        '  ---',
+        '  name: Skill 2',
+        '  description: ...',
+        '  metadata:',
+        '    requires:',
+        '      params: [SHARED_PARAM]  # Same param key as Skill 1!',
+        '  ---',
+        '  [Skill 2 content]',
+      ].join('\n'),
+    ),
     createMessage(
       'user',
       JSON.stringify({
         request,
-        skillName,
-        description,
+        skillsToCreate,
         availableResearchTools: researchTools.map((tool) => ({
           name: tool.name,
           description: tool.description,
@@ -328,15 +345,15 @@ async function createSkillPlaybook(
     ),
   ];
 
-  let rawMarkdown = '';
+  let rawMarkdownBatch = '';
 
   for (let step = 0; step < SKILL_RESEARCH_MAX_STEPS; step++) {
     const response = await client.complete(messages, researchTools, false);
     const resolved = assertNonStreamingResponse(response);
 
     if (resolved.text.trim()) {
-      rawMarkdown = resolved.text.trim();
-      messages.push(createMessage('assistant', rawMarkdown));
+      rawMarkdownBatch = resolved.text.trim();
+      messages.push(createMessage('assistant', rawMarkdownBatch));
     }
 
     if (resolved.toolCalls.length === 0) {
@@ -357,12 +374,29 @@ async function createSkillPlaybook(
     }
   }
 
-  if (!rawMarkdown.trim()) {
-    throw new Error('Skill generation returned no markdown content.');
+  if (!rawMarkdownBatch.trim()) {
+    throw new Error('Batch skill generation returned no markdown content.');
   }
 
-  const skill = parseSkillMarkdown(rawMarkdown, { idHint: skillName });
-  return { skill, markdown: rawMarkdown };
+  // Parse the batch response into individual skills
+  const skillMarkdowns = rawMarkdownBatch.split('===SKILL_SEPARATOR===').map((md) => md.trim());
+
+  if (skillMarkdowns.length !== skillsToCreate.length) {
+    throw new Error(
+      `Expected ${skillsToCreate.length} skills but batch generation returned ${skillMarkdowns.length} skills. ` +
+      `Make sure each skill is separated by exactly "===SKILL_SEPARATOR===" on its own line.`,
+    );
+  }
+
+  const bundles: SkillBundle[] = skillMarkdowns.map((markdown, idx) => {
+    if (!markdown) {
+      throw new Error(`Skill ${idx + 1} markdown is empty.`);
+    }
+    const skill = parseSkillMarkdown(markdown, { idHint: skillsToCreate[idx]!.name });
+    return { skill, markdown };
+  });
+
+  return bundles;
 }
 
 async function generateAgentName(request: string): Promise<string> {

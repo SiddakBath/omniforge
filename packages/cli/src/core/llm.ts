@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenAI } from '@google/genai';
 import OpenAI from 'openai';
+import { randomUUID } from 'crypto';
 import type { LLMClient, LLMResponse, LLMStreamEvent, Message, ToolCall, ToolDefinition } from './types.js';
 import type { ProviderCatalogEntry } from './types.js';
 
@@ -31,6 +32,30 @@ function toOpenAITools(tools: ToolDefinition[]): OpenAI.Chat.Completions.ChatCom
       parameters: tool.parameters,
     },
   }));
+}
+
+function parseToolInput(raw: unknown): Record<string, unknown> {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      return {};
+    }
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return { value: parsed };
+    } catch {
+      return { value: trimmed };
+    }
+  }
+
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+
+  return {};
 }
 
 export class OpenAICompatibleClient implements LLMClient {
@@ -65,9 +90,9 @@ export class OpenAICompatibleClient implements LLMClient {
       const toolCalls: ToolCall[] = (choice?.tool_calls ?? []).reduce<ToolCall[]>((acc: ToolCall[], call) => {
         if (call.type === 'function') {
           acc.push({
-            id: call.id,
+            id: call.id || randomUUID(),
             name: call.function.name,
-            input: JSON.parse(call.function.arguments || '{}') as Record<string, unknown>,
+            input: parseToolInput(call.function.arguments),
           });
         }
         return acc;

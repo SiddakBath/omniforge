@@ -5,6 +5,7 @@ import { runCreateAgentCommand } from './commands/create-agent.js';
 import { runOnboardingCommand } from './commands/onboarding.js';
 import { runAgentsCommand } from './commands/agents.js';
 import { runSchedulerCommand } from './commands/scheduler.js';
+import { runSchedulerServiceCommand } from './commands/scheduler-service.js';
 import { runSkillsCommand } from './commands/skills.js';
 import { runSettingsCommand } from './commands/settings.js';
 import { runResetCommand } from './commands/reset.js';
@@ -32,7 +33,15 @@ program
   });
 
 program.command('agents').description('List resumable agents').action(runAgentsCommand);
-program.command('scheduler').alias('schedule').description('Run scheduled agents continuously').action(runSchedulerCommand);
+program.command('scheduler').alias('schedule').description('Run scheduler service for daily agent schedules').action(runSchedulerCommand);
+program
+  .command('scheduler-service')
+  .alias('schedule-service')
+  .description('Manage automatic scheduler startup for this user')
+  .argument('[action]', 'install | uninstall | status', 'status')
+  .action(async (action: string) => {
+    await runSchedulerServiceCommand(action);
+  });
 program.command('skills').description('Show skill library').action(runSkillsCommand);
 program.command('settings').description('View current OmniForge settings').action(runSettingsCommand);
 program.command('reset').description('Reset OmniForge state (config, agents, skills)').action(runResetCommand);

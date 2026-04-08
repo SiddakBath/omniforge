@@ -2,6 +2,7 @@ import type { ToolCall, ToolDefinition, ToolExecutionResult } from '../types.js'
 import { applyPatchTool } from './apply-patch.js';
 import { httpRequestTool } from './http-request.js';
 import { readFileTool } from './read-file.js';
+import { scheduleTool } from './schedule.js';
 import { terminalCommandTool } from './terminal-command.js';
 import type { BuiltinToolContext, BuiltinToolSpec } from './types.js';
 import { webSearchTool } from './web-search.js';
@@ -14,6 +15,7 @@ const TOOL_SPECS: BuiltinToolSpec[] = [
   terminalCommandTool,
   httpRequestTool,
   webSearchTool,
+  scheduleTool,
 ];
 
 const TOOL_BY_NAME = new Map<string, BuiltinToolSpec>();

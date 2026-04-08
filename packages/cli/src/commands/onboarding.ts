@@ -1,12 +1,11 @@
 import { loadConfig, loadProviderCatalog, runOnboarding, type WebSearchProvider } from '../core/index.js';
 import { confirm, password, select } from '@inquirer/prompts';
 import { displayBanner } from '../utils/banner.js';
-
-type ProviderEntry = {
-  id: string;
-  name: string;
-  models: Array<{ id: string; contextWindow: number; tags: string[] }>;
-};
+import {
+  ensureOllamaReadyInteractive,
+  pullAnotherOllamaModelInteractive,
+  type ProviderEntry,
+} from './ollama-setup.js';
 
 function formatModelDescription(model: { contextWindow: number; tags: string[] }): string {
   return `${model.contextWindow.toLocaleString()} context • ${model.tags.join(', ')}`;
@@ -51,27 +50,42 @@ export async function runOnboardingCommand(): Promise<void> {
 
   const existingConfig = await loadConfig();
 
-  const providers = (await loadProviderCatalog()) as ProviderEntry[];
-  if (providers.length === 0) {
-    throw new Error('No providers found in catalog.');
-  }
+  const selectProviderStep = async (): Promise<ProviderEntry> => {
+    const providers = (await loadProviderCatalog()) as ProviderEntry[];
+    if (providers.length === 0) {
+      throw new Error('No providers found in catalog.');
+    }
 
-  let selectedProviderId = await select({
-    message: 'Step 1/6 — Select provider',
-    choices: providers.map((provider) => ({
-      name: `${provider.name} (${provider.models.length} models)`,
-      value: provider.id,
-      description: `Provider ID: ${provider.id}`,
-    })),
-    pageSize: 10,
-  });
+    const selectedProviderId = await select({
+      message: 'Step 1/6 — Select provider',
+      choices: providers.map((provider) => ({
+        name: `${provider.name} (${provider.models.length} models)`,
+        value: provider.id,
+        description: `Provider ID: ${provider.id}`,
+      })),
+      pageSize: 10,
+    });
 
-  let selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
-  if (!selectedProvider) {
-    throw new Error(`Provider not found: ${selectedProviderId}`);
-  }
+    const selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
+    if (!selectedProvider) {
+      throw new Error(`Provider not found: ${selectedProviderId}`);
+    }
+
+    return selectedProvider;
+  };
+
+  let selectedProvider = await selectProviderStep();
 
   while (true) {
+    if (selectedProvider.id === 'ollama') {
+      const ensured = await ensureOllamaReadyInteractive(selectedProvider);
+      if (ensured.goBack) {
+        selectedProvider = await selectProviderStep();
+        continue;
+      }
+      selectedProvider = ensured.provider;
+    }
+
     const selectedModelId = await select({
       message: `Step 2/6 — Select model for ${selectedProvider.name}`,
       choices: [
@@ -80,6 +94,15 @@ export async function runOnboardingCommand(): Promise<void> {
           value: model.id,
           description: formatModelDescription(model),
         })),
+        ...(selectedProvider.id === 'ollama'
+          ? [
+              {
+                name: '➕ Download another Ollama model',
+                value: '__pull_model__',
+                description: 'Run `ollama pull <model>` now and refresh this list',
+              },
+            ]
+          : []),
         {
           name: '← Back to provider selection',
           value: '__back__',
@@ -90,28 +113,28 @@ export async function runOnboardingCommand(): Promise<void> {
     });
 
     if (selectedModelId === '__back__') {
-      selectedProviderId = await select({
-        message: 'Step 1/6 — Select provider',
-        choices: providers.map((provider) => ({
-          name: `${provider.name} (${provider.models.length} models)`,
-          value: provider.id,
-          description: `Provider ID: ${provider.id}`,
-        })),
-        pageSize: 10,
-      });
+      selectedProvider = await selectProviderStep();
+      continue;
+    }
 
-      selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
-      if (!selectedProvider) {
-        throw new Error(`Provider not found: ${selectedProviderId}`);
+    if (selectedModelId === '__pull_model__') {
+      await pullAnotherOllamaModelInteractive();
+      const refreshedProviders = (await loadProviderCatalog()) as ProviderEntry[];
+      const refreshed = refreshedProviders.find((provider) => provider.id === selectedProvider.id);
+      if (refreshed) {
+        selectedProvider = refreshed;
       }
       continue;
     }
 
-    const apiKey = await password({
-      message: `Step 3/6 — Enter ${selectedProvider.name} API key`,
-      mask: '*',
-      validate: (value) => (value.trim().length > 0 ? true : 'API key is required.'),
-    });
+    const apiKeyRequired = selectedProvider.requiresApiKey !== false;
+    const apiKey = apiKeyRequired
+      ? await password({
+          message: `Step 3/6 — Enter ${selectedProvider.name} API key`,
+          mask: '*',
+          validate: (value) => (value.trim().length > 0 ? true : 'API key is required.'),
+        })
+      : '';
 
     const enableWebSearch = await confirm({
       message: 'Step 4/6 — Enable built-in web search? (recommended)',
@@ -169,19 +192,7 @@ export async function runOnboardingCommand(): Promise<void> {
       });
 
       if (restart) {
-        selectedProviderId = await select({
-          message: 'Step 1/6 — Select provider',
-          choices: providers.map((provider) => ({
-            name: `${provider.name} (${provider.models.length} models)`,
-            value: provider.id,
-            description: `Provider ID: ${provider.id}`,
-          })),
-          pageSize: 10,
-        });
-        selectedProvider = providers.find((provider) => provider.id === selectedProviderId);
-        if (!selectedProvider) {
-          throw new Error(`Provider not found: ${selectedProviderId}`);
-        }
+        selectedProvider = await selectProviderStep();
         continue;
       }
 
@@ -192,7 +203,7 @@ export async function runOnboardingCommand(): Promise<void> {
     await runOnboarding({
       provider: selectedProvider.id,
       model: selectedModelId,
-      apiKey,
+      ...(apiKey ? { apiKey } : {}),
       webSearch: enableWebSearch
         ? {
             enabled: true,

@@ -17,18 +17,21 @@ export async function createLLMClient(providerId?: string, model?: string): Prom
     throw new Error(`Unknown provider: ${selectedProvider}`);
   }
 
-  const providerKey = config.providers[selectedProvider]?.apiKey;
-  if (!providerKey) {
+  const providerKey = config.providers[selectedProvider]?.apiKey?.trim();
+  const apiKeyRequired = provider.requiresApiKey !== false;
+  if (apiKeyRequired && !providerKey) {
     throw new Error(`Missing API key for provider ${selectedProvider}.`);
   }
 
+  const resolvedApiKey = providerKey || 'not-required';
+
   if (selectedProvider === 'anthropic') {
-    return new AnthropicClient(providerKey, selectedModel);
+    return new AnthropicClient(resolvedApiKey, selectedModel);
   }
 
   if (selectedProvider === 'gemini') {
-    return new GeminiClient(providerKey, selectedModel);
+    return new GeminiClient(resolvedApiKey, selectedModel);
   }
 
-  return new OpenAICompatibleClient(provider, providerKey, selectedModel);
+  return new OpenAICompatibleClient(provider, resolvedApiKey, selectedModel);
 }
