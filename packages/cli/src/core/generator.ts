@@ -46,6 +46,32 @@ export interface GenerateAgentOutput {
 }
 
 const SKILL_RESEARCH_MAX_STEPS = 6;
+const SKILL_SEPARATOR = '===SKILL_SEPARATOR===';
+
+function splitBatchSkillMarkdown(rawMarkdownBatch: string): string[] {
+  const chunks: string[] = [];
+  let current: string[] = [];
+
+  for (const line of rawMarkdownBatch.split(/\r?\n/)) {
+    if (line.trim() === SKILL_SEPARATOR) {
+      const chunk = current.join('\n').trim();
+      if (chunk.length > 0) {
+        chunks.push(chunk);
+      }
+      current = [];
+      continue;
+    }
+
+    current.push(line);
+  }
+
+  const finalChunk = current.join('\n').trim();
+  if (finalChunk.length > 0) {
+    chunks.push(finalChunk);
+  }
+
+  return chunks;
+}
 
 export async function generateAgent(input: GenerateAgentInput): Promise<GenerateAgentOutput> {
   const config = await loadConfig();
@@ -379,12 +405,12 @@ async function createSkillPlaybookBatch(
   }
 
   // Parse the batch response into individual skills
-  const skillMarkdowns = rawMarkdownBatch.split('===SKILL_SEPARATOR===').map((md) => md.trim());
+  const skillMarkdowns = splitBatchSkillMarkdown(rawMarkdownBatch);
 
   if (skillMarkdowns.length !== skillsToCreate.length) {
     throw new Error(
       `Expected ${skillsToCreate.length} skills but batch generation returned ${skillMarkdowns.length} skills. ` +
-      `Make sure each skill is separated by exactly "===SKILL_SEPARATOR===" on its own line.`,
+      `Make sure each skill is separated by exactly "${SKILL_SEPARATOR}" on its own line.`,
     );
   }
 

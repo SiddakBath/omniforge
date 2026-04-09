@@ -43,8 +43,9 @@ export async function loadStarterSkillBundles(): Promise<SkillBundle[]> {
   }
 
   // Resolve skills directory relative to this file's location (works regardless of cwd)
-  // __dirname is packages/cli/src/core, skills folder is at the repository root
-  const skillsDir = path.resolve(__dirname, '..', '..', '..', 'skills');
+  // __dirname is packages/cli/src/core (or packages/cli/dist/core in built output),
+  // skills folder is at the repository root.
+  const skillsDir = path.resolve(__dirname, '..', '..', '..', '..', 'skills');
   
   return loadFromDirectory(skillsDir);
 }
