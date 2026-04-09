@@ -14,8 +14,6 @@ OmniForge is for people who want automation outcomes, not framework plumbing.
 - Let OmniForge generate and run the workflow.
 - Keep control of your data and provider keys locally.
 
-You can still extend it as a developer, but the product goal is simple: **non-developers can use it successfully**.
-
 ## What ships
 
 - **End-user CLI app** (`omniforge`) for onboarding, creating automations, and running agents
@@ -56,47 +54,33 @@ Resume an existing agent:
 omniforge agents
 ```
 
-Run scheduled agents continuously:
+## Run from source (development)
 
 ```bash
-omniforge scheduler
-```
-
-## Run from source (optional)
-
-### 1) Install dependencies
-
-```bash
+git clone https://github.com/siddakBath/omniforge.git
+cd omniforge
 npm install
-```
-
-### 2) Build workspace
-
-```bash
 npm run build
 ```
 
-### 3) First-time onboarding (CLI)
+First-time onboarding:
 
 ```bash
 npm run dev:cli -- onboard
 ```
 
-This sets your default generator provider/model and stores keys in `~/.omniforge/config.json`.
-
-### 4) Create an agent
+Create and manage agents:
 
 ```bash
-npm run dev:cli -- create "I need an agent that monitors my Gmail for investor replies and drafts follow-ups in my voice"
+npm run dev:cli -- create "Your automation description"
+npm run dev:cli -- agents
 ```
 
-### 5) Run local CLI
+Optional: configure scheduler startup from source:
 
 ```bash
-npm run dev
+npm run dev:cli -- scheduler-service install
 ```
-
-Then use the interactive CLI to continue managing agents and skills.
 
 ## Architecture overview
 
@@ -132,6 +116,7 @@ Optional per-agent daily schedule is stored in the `schedule` field inside `agen
 Runtime context is bounded automatically to the most recent messages (default `60`), while always injecting `system-prompt.md` at the top for every model call. Configure with `OMNIFORGE_MAX_CONTEXT_MESSAGES`.
 
 Scheduling is timezone-aware (IANA timezone) and runs once per day at configured `HH:mm` local time.
+The scheduler dynamically reloads schedule changes and runs catch-up jobs missed during downtime.
 
 ## Contributing
 
@@ -145,7 +130,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, standards, and pull request re
 
 ## Notes
 
-- Provider catalog includes: Anthropic, OpenAI, Gemini, DeepSeek, xAI, Groq, Mistral, OpenRouter.
+- Provider catalog includes: Anthropic, OpenAI, Gemini, Ollama (local), DeepSeek, xAI, Groq, Mistral, OpenRouter.
 - Anthropic and Gemini use native SDK paths; compatible providers use OpenAI-style API routing.
 - Skills are markdown playbooks with YAML frontmatter metadata.
 - Tools are runtime capabilities and are injected separately from skills.
