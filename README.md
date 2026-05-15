@@ -1,8 +1,10 @@
-# OmniForge
+# ⚒️ OmniForge
+
+![alt text](image.png)
 
 OmniForge is a local-first, open-source AI automation app:
 
-> you describe it, the LLM builds it, you run it.
+> you describe it, the LLM builds the agent, you run it.
 
 No YAML. No marketplace. No config sprawl.
 
